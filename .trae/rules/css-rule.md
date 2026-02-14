@@ -1,0 +1,12 @@
+---
+alwaysApply: false
+description: 在nongyu项目的前端代码中生效，用于描述项目的css规范
+---
+#### css规范
+css规范参考：
+- 所有css样式均采用原生语法
+- 所有css样式均采用`StyleSheet`方式引入
+- 所有css样式均采用`BEM`命名规范
+- 所有css样式均采用`mobile first`方式编写
+- 所有css样式均采用`flex`布局
+- 尽可能实现响应式布局效果

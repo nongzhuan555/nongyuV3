@@ -1,0 +1,8 @@
+{
+  "//": "Prettier配置：统一代码格式（与ESLint集成）",
+  "singleQuote": true,
+  "trailingComma": "all",
+  "printWidth": 100,
+  "tabWidth": 2,
+  "semi": true
+}
