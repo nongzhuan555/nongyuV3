@@ -1,6 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { View, StyleSheet, FlatList, TouchableOpacity, LayoutAnimation, Platform, UIManager } from 'react-native';
 import { Text, Checkbox, Button, Dialog, Portal, TextInput, FAB, Divider, Card, useTheme } from 'react-native-paper';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import type { MD3Theme } from 'react-native-paper';
 
 type TodoStatus = 'todo' | 'done';
 
@@ -20,35 +22,18 @@ type Props = {
 const nowISO = () => new Date().toISOString();
 const MAX_LEN = 140;
 
-const seed: Todo[] = [
-  {
-    id: 't_001',
-    courseId: 'c_001',
-    content: '阅读课程资料：线性代数第5章要点梳理',
-    status: 'todo',
-    createdAt: nowISO(),
-    completedAt: null,
-  },
-  {
-    id: 't_002',
-    courseId: 'c_001',
-    content: '提交课堂小练习（第3次）',
-    status: 'done',
-    createdAt: nowISO(),
-    completedAt: nowISO(),
-  },
-];
-
-export default function TodoList(props: Props) {
+export default function TodoList(props: Props & { embedded?: boolean; style?: any }) {
   const courseId = props.courseId ?? 'c_001';
+  const { embedded, style } = props;
   const theme = useTheme();
-  const styles = useMemo(() => createStyles(theme), [theme]);
+  const styles = useMemo(() => createStyles(theme, embedded), [theme, embedded]);
 
-  useEffect(() => {
-    if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
-      UIManager.setLayoutAnimationEnabledExperimental(true);
-    }
-  }, []);
+  // LayoutAnimation is enabled by default in New Architecture
+  // useEffect(() => {
+  //   if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+  //     UIManager.setLayoutAnimationEnabledExperimental(true);
+  //   }
+  // }, []);
 
   const smooth = () => {
     LayoutAnimation.configureNext({
@@ -58,7 +43,31 @@ export default function TodoList(props: Props) {
       delete: { type: LayoutAnimation.Types.easeInEaseOut, property: LayoutAnimation.Properties.opacity },
     });
   };
-  const [items, setItems] = useState<Todo[]>(seed.filter((t) => t.courseId === courseId));
+  const [items, setItems] = useState<Todo[]>([]);
+  const [loaded, setLoaded] = useState(false);
+  const storageKey = `TODO_LIST_${courseId}`;
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const json = await AsyncStorage.getItem(storageKey);
+        if (json) {
+          setItems(JSON.parse(json));
+        }
+      } catch (e) {
+        // ignore
+      } finally {
+        setLoaded(true);
+      }
+    })();
+  }, [storageKey]);
+
+  useEffect(() => {
+    if (loaded) {
+      AsyncStorage.setItem(storageKey, JSON.stringify(items)).catch(() => {});
+    }
+  }, [items, storageKey, loaded]);
+
   const [createVisible, setCreateVisible] = useState(false);
   const [detailVisible, setDetailVisible] = useState(false);
   const [confirmVisible, setConfirmVisible] = useState(false);
@@ -128,7 +137,7 @@ export default function TodoList(props: Props) {
       onPress={() => openDetail(item)}
       onLongPress={() => requestDelete(item)}
     >
-      <Card style={styles.card}>
+      <Card style={styles.card} mode={embedded ? 'outlined' : 'elevated'}>
         <View style={styles.cardRow}>
           <Checkbox
             status={item.status === 'done' ? 'checked' : 'unchecked'}
@@ -150,16 +159,18 @@ export default function TodoList(props: Props) {
   );
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, style]}>
       <FlatList
         data={[{ type: 'todo' as const }, { type: 'done' as const }]}
         keyExtractor={(i) => i.type}
+        scrollEnabled={!embedded}
         renderItem={({ item }) => {
           const list = item.type === 'todo' ? todoList : doneList;
+          if (embedded && list.length === 0 && item.type === 'done') return null; // 嵌入模式下如果没有已完成项则隐藏已完成区
           return (
             <View>
-              <Text style={styles.sectionTitle}>{item.type === 'todo' ? '待办区' : '已办区'}</Text>
-              <Divider />
+              <Text style={styles.sectionTitle}>{item.type === 'todo' ? '待办' : '已完成'}</Text>
+              {!embedded && <Divider />}
               {list.length === 0 ? (
                 <Text style={styles.empty}>{item.type === 'todo' ? '暂无待办' : '暂无已办'}</Text>
               ) : (
@@ -176,6 +187,11 @@ export default function TodoList(props: Props) {
           );
         }}
         contentContainerStyle={styles.listContent}
+        ListFooterComponent={embedded ? (
+          <Button mode="contained-tonal" icon="plus" onPress={() => setCreateVisible(true)} style={{ marginTop: 12 }}>
+            添加待办
+          </Button>
+        ) : null}
       />
 
       <Portal>
@@ -235,7 +251,7 @@ export default function TodoList(props: Props) {
         </Dialog>
       </Portal>
 
-      <FAB icon="plus" style={styles.fab} onPress={() => setCreateVisible(true)} />
+      <FAB icon="plus" style={styles.fab} onPress={() => setCreateVisible(true)} visible={!embedded} />
     </View>
   );
 }
@@ -251,16 +267,16 @@ function formatTime(iso?: string | null) {
   return `${y}-${m}-${day} ${hh}:${mm}`;
 }
 
-function createStyles(theme: any) {
-  const onSurface = theme.colors?.onSurface ?? '#222';
-  const onSurfaceVariant = theme.colors?.onSurfaceVariant ?? '#666';
-  const outline = theme.colors?.outline ?? '#ccc';
-  const surface = theme.colors?.surface ?? '#fff';
-  const onSurfaceDisabled = theme.colors?.onSurfaceDisabled ?? '#999';
-  const surfaceVariant = theme.colors?.surfaceVariant ?? '#f3f3f3';
+function createStyles(theme: MD3Theme, embedded?: boolean) {
+  const onSurface = theme.colors.onSurface;
+  const onSurfaceVariant = theme.colors.onSurfaceVariant;
+  const outline = theme.colors.outline;
+  const surface = theme.colors.surface;
+  const onSurfaceDisabled = theme.colors.onSurfaceDisabled;
+  const surfaceVariant = theme.colors.surfaceVariant;
   return StyleSheet.create({
-    container: { flex: 1, backgroundColor: theme.colors?.background },
-    listContent: { padding: 12, paddingBottom: 80, gap: 8 },
+    container: { flex: embedded ? 0 : 1, backgroundColor: embedded ? 'transparent' : theme.colors?.background },
+    listContent: { padding: embedded ? 0 : 12, paddingBottom: embedded ? 0 : 80, gap: 8 },
     sectionTitle: { fontSize: 14, color: onSurfaceVariant, marginTop: 8, marginBottom: 4 },
     empty: { color: onSurfaceVariant, paddingVertical: 8 },
     card: {
@@ -277,7 +293,7 @@ function createStyles(theme: any) {
     detailText: { fontSize: 16, color: onSurface },
     detailMeta: { fontSize: 12, color: onSurfaceVariant, marginTop: 8 },
     fab: { position: 'absolute', right: 16, bottom: 24 },
-    dialog: { borderRadius: 16 },
+    dialog: { borderRadius: 16, borderWidth: 1, borderColor: outline },
     dialogContent: { paddingTop: 6 },
     dialogInput: {
       minHeight: 120,

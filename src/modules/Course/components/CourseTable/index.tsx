@@ -1,11 +1,60 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Dimensions, ScrollView, StyleSheet, TouchableOpacity, View, Animated, Easing, Pressable, Platform } from 'react-native';
+import { Dimensions, ScrollView, StyleSheet, TouchableOpacity, View, Animated, Easing, Pressable, Platform, BackHandler } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Button, Text, useTheme, TextInput, Chip } from 'react-native-paper';
+import { Button, Text, useTheme, TextInput, Chip, MD3Theme, Snackbar, ActivityIndicator } from 'react-native-paper';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-const courseData = require('@/jiaowu/course/course.json');
+import courseData from '@/jiaowu/course/course.json';
+import { fetchCourseSchedule, CourseScheduleData } from '@/jiaowu/course/schedule';
+import CourseDetailModal from './CourseDetailModal';
+import { CourseEntry, AttendanceRecord, WeekRange } from './types';
+import { profileStore } from '@/stores/profile';
+import { observer } from 'mobx-react-lite';
 
 type GridRow = string[];
+type TimeEntry = { day: number; start: number; end: number; odd: boolean; even: boolean };
+type Suppression = {
+  name: string;
+  day: number;
+  startPeriod: number;
+  endPeriod: number;
+  room: string;
+  teacher: string;
+  weeksList: number[];
+};
+
+const COURSE_COLORS = [
+  { bg: '#E8F1FF', text: '#2B5797' }, // 柔和蓝
+  { bg: '#FDF2F4', text: '#B8325E' }, // 柔和粉
+  { bg: '#E6F7F3', text: '#00856F' }, // 柔和绿
+  { bg: '#FFF7E6', text: '#B36B00' }, // 柔和橙
+  { bg: '#F2F0FA', text: '#5B4FA2' }, // 柔和紫
+  { bg: '#EBF9F9', text: '#007C89' }, // 柔和青
+  { bg: '#FFF9E6', text: '#997B00' }, // 柔和黄
+  { bg: '#F0F4F8', text: '#3E5463' }, // 柔和灰蓝
+];
+
+const COURSE_TIMES = [
+  { start: '08:10', end: '08:55' },
+  { start: '09:05', end: '09:50' },
+  { start: '10:10', end: '10:55' },
+  { start: '11:05', end: '11:50' },
+  { start: '14:20', end: '15:05' },
+  { start: '15:15', end: '16:00' },
+  { start: '16:20', end: '17:05' },
+  { start: '17:15', end: '18:00' },
+  { start: '19:30', end: '20:15' },
+  { start: '20:25', end: '21:10' },
+];
+
+function getCourseColor(name: string) {
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) {
+    hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  const index = Math.abs(hash) % COURSE_COLORS.length;
+  return COURSE_COLORS[index];
+}
 
 function getHeaderIndexMap(header: GridRow) {
   const map: Record<string, number> = {};
@@ -27,7 +76,7 @@ function parseWeekRange(s: string) {
   return null;
 }
 
-function parseTimeEntries(s: string) {
+function parseTimeEntries(s: string): TimeEntry[] {
   if (!s) return [];
   const lines = s.split(/\n+/).map(t => t.trim()).filter(Boolean);
   return lines
@@ -50,7 +99,7 @@ function parseTimeEntries(s: string) {
       if (d1 !== d2) return null;
       return { day: d1, start: Math.min(p1, p2), end: Math.max(p1, p2), odd, even };
     })
-    .filter(Boolean) as Array<{ day: number; start: number; end: number; odd: boolean; even: boolean }>;
+    .filter((item): item is TimeEntry => item !== null);
 }
 
 function slotIndexFromPeriod(p: number) {
@@ -82,7 +131,7 @@ function normalizeCourses(rows: GridRow[]) {
   const idxTime = map['上课时间'] ?? 5;
   const idxTeacher = map['教师'] ?? 14;
   const maxWeek = maxWeekFromRows(rows, idxWeeks);
-  const courses: any[] = [];
+  const courses: CourseEntry[] = [];
   for (let i = 1; i < rows.length; i++) {
     const r = rows[i];
     const name = (r[idxName] || '').trim();
@@ -113,7 +162,7 @@ function normalizeCourses(rows: GridRow[]) {
   return { courses, maxWeek };
 }
 
-function weekMatches(week: number, info: any) {
+function weekMatches(week: number, info: CourseEntry) {
   if (Array.isArray(info.weeksList) && info.weeksList.length > 0) {
     return info.weeksList.includes(week);
   }
@@ -167,10 +216,16 @@ function isSameDay(a: Date, b: Date) {
   return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
 }
 
-function buildWeekMatrix(maxWeek: number, courses: any[], suppressed?: (c: any, w: number) => boolean) {
-  const weeks: Array<Array<Array<any>>> = [];
+function buildWeekMatrix(
+  maxWeek: number,
+  courses: CourseEntry[],
+  suppressed?: (c: CourseEntry, w: number) => boolean,
+) {
+  const weeks: Array<Array<Array<CourseEntry[]>>> = [];
   for (let w = 1; w <= maxWeek; w++) {
-    const grid: Array<Array<any>> = Array.from({ length: 5 }).map(() => Array.from({ length: 7 }).map(() => []));
+    const grid: Array<Array<CourseEntry[]>> = Array.from({ length: 5 }).map(() =>
+      Array.from({ length: 7 }).map(() => [] as CourseEntry[]),
+    );
     courses.forEach(c => {
       if (!weekMatches(w, c)) return;
       if (suppressed && suppressed(c, w)) return;
@@ -183,45 +238,104 @@ function buildWeekMatrix(maxWeek: number, courses: any[], suppressed?: (c: any, 
   return weeks;
 }
 
-export default function CourseTable() {
+function CourseTable() {
   const theme = useTheme();
+  const styles = useMemo(() => createStyles(theme), [theme]);
   const insets = useSafeAreaInsets();
-  const grid = (courseData?.grid || []) as GridRow[];
+  
+  const [scheduleData, setScheduleData] = useState<CourseScheduleData>(courseData as any);
+  const [loading, setLoading] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  const COURSE_STORAGE_KEY = 'JIAOWU_COURSE_DATA';
+  const CUSTOM_COURSE_STORAGE_KEY = 'JIAOWU_CUSTOM_COURSE_DATA';
+
+  const fetchSchedule = useCallback(async () => {
+    setLoading(true);
+    try {
+      // 优先从本地加载
+      const localData = await AsyncStorage.getItem(COURSE_STORAGE_KEY);
+      if (localData) {
+        setScheduleData(JSON.parse(localData));
+      } else {
+        // 本地没有数据，再从网络拉取
+        try {
+          const data = await fetchCourseSchedule();
+          setScheduleData(data);
+          AsyncStorage.setItem(COURSE_STORAGE_KEY, JSON.stringify(data));
+        } catch (e) {
+          // 网络拉取失败，且本地无数据，则显示空状态
+          setScheduleData(null);
+        }
+      }
+    } catch (err) {
+      console.warn('Failed to fetch course schedule:', err);
+      setErrorMsg('获取课表数据失败');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const { profile } = profileStore;
+  // 监听用户登录状态变化
+  useEffect(() => {
+    // 如果没有学号，说明已退出或未登录，直接清空数据
+    if (!profile.studentId) {
+      setScheduleData(null);
+      setCustoms([]);
+    } else {
+      // 有学号，说明是登录状态，执行数据加载
+      fetchSchedule();
+      AsyncStorage.getItem(CUSTOM_COURSE_STORAGE_KEY).then(json => {
+        if (json) {
+          try {
+            setCustoms(JSON.parse(json));
+          } catch (e) {
+            console.error('Failed to parse custom courses', e);
+          }
+        } else {
+          setCustoms([]);
+        }
+      });
+    }
+  }, [profile.studentId, fetchSchedule]);
+
+  // 保存自定义课程数据
+  useEffect(() => {
+    if (customs.length > 0) {
+      AsyncStorage.setItem(CUSTOM_COURSE_STORAGE_KEY, JSON.stringify(customs));
+    }
+  }, [customs]);
+
+  const grid = (scheduleData?.grid || []) as GridRow[];
+
   const { courses, maxWeek } = useMemo(() => normalizeCourses(grid), [grid]);
-  const [customs, setCustoms] = useState<any[]>([]);
+  const [customs, setCustoms] = useState<CourseEntry[]>([]);
   const allCourses = useMemo(() => [...courses, ...customs], [courses, customs]);
-  const weeks = useMemo(() => buildWeekMatrix(maxWeek, allCourses, isSuppressed), [maxWeek, allCourses, suppressions]);
+  const weeks = useMemo(() => buildWeekMatrix(maxWeek, allCourses, isSuppressed), [maxWeek, allCourses]);
   const width = Dimensions.get('window').width;
   const height = Dimensions.get('window').height;
   const svRef = useRef<ScrollView>(null);
   const initialWeek = Math.min(maxWeek, Math.max(1, computeCurrentWeek()));
   const [active, setActive] = useState(initialWeek - 1);
-  const [selected, setSelected] = useState<any | null>(null);
+  const [selected, setSelected] = useState<CourseEntry | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
-  const fade = useRef(new Animated.Value(0)).current;
-  const scale = useRef(new Animated.Value(0.96)).current;
   const [confirmVisible, setConfirmVisible] = useState(false);
   const confirmFade = useRef(new Animated.Value(0)).current;
   const confirmScale = useRef(new Animated.Value(0.96)).current;
   const [deleteWeeks, setDeleteWeeks] = useState<number[]>([]);
-  const [suppressions, setSuppressions] = useState<Array<{
-    name: string;
-    day: number;
-    startPeriod: number;
-    endPeriod: number;
-    room: string;
-    teacher: string;
-    weeksList: number[];
-  }>>([]);
+  const [suppressions, setSuppressions] = useState<Suppression[]>([]);
   const [addVisible, setAddVisible] = useState(false);
   const addFade = useRef(new Animated.Value(0)).current;
   const addScale = useRef(new Animated.Value(0.96)).current;
   const [addTarget, setAddTarget] = useState<{ day: number; slot: number } | null>(null);
   const [addTitle, setAddTitle] = useState('');
   const [addRoom, setAddRoom] = useState('');
+  const [addTeacher, setAddTeacher] = useState('');
+  const [addType, setAddType] = useState<'course' | 'schedule'>('schedule');
   const [addWeeks, setAddWeeks] = useState<number[]>([]);
   const [armedCell, setArmedCell] = useState<{ c: number; r: number } | null>(null);
-  const armedTimer = useRef<any>(null);
+  const armedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     setTimeout(() => {
@@ -235,7 +349,7 @@ export default function CourseTable() {
     svRef.current?.scrollTo({ x: w * width, animated: true });
   };
 
-  const weeksOfCourse = (course: any, maxWeekLocal: number) => {
+  const weeksOfCourse = (course: CourseEntry, maxWeekLocal: number) => {
     if (Array.isArray(course.weeksList) && course.weeksList.length > 0) {
       return course.weeksList.slice();
     }
@@ -250,34 +364,53 @@ export default function CourseTable() {
     return arr;
   };
 
-  const openModal = useCallback((course: any) => {
-    setSelected(course);
-    const all = weeksOfCourse(course, maxWeek);
-    const cur = active + 1;
-    setDeleteWeeks(all.includes(cur) ? [cur] : []);
-    setModalVisible(true);
-    fade.setValue(0);
-    scale.setValue(0.96);
-    Animated.parallel([
-      Animated.timing(fade, { toValue: 1, duration: 140, easing: Easing.out(Easing.quad), useNativeDriver: true }),
-      Animated.timing(scale, { toValue: 1, duration: 140, easing: Easing.out(Easing.quad), useNativeDriver: true }),
-    ]).start();
+  // 考勤数据 state: { [courseName]: { present: 0, late: 0, absent: 0 } }
+  const [attendanceData, setAttendanceData] = useState<Record<string, AttendanceRecord>>({});
+
+  const handleUpdateAttendance = (type: keyof AttendanceRecord, delta: number) => {
+    if (!selected) return;
+    setAttendanceData(prev => {
+      const current = prev[selected.name] || { present: 0, late: 0, absent: 0 };
+      const newValue = Math.max(0, current[type] + delta);
+      return {
+        ...prev,
+        [selected.name]: { ...current, [type]: newValue },
+      };
+    });
+  };
+
+  const openModal = useCallback((course: CourseEntry) => {
+    // 快速显示一个加载状态，让用户感觉到交互
+    setLoading(true);
+
+    // 将实际的弹窗显示推迟到下一帧，给UI渲染loading的机会
+    requestAnimationFrame(() => {
+      setTimeout(() => {
+        setSelected(course);
+        const all = weeksOfCourse(course, maxWeek);
+        const cur = active + 1;
+        setDeleteWeeks(all.includes(cur) ? [cur] : []);
+        setModalVisible(true);
+        setLoading(false);
+      }, 0);
+    });
   }, [active, maxWeek]);
 
   const closeModal = useCallback(() => {
-    Animated.parallel([
-      Animated.timing(fade, { toValue: 0, duration: 120, easing: Easing.in(Easing.quad), useNativeDriver: true }),
-      Animated.timing(scale, { toValue: 0.96, duration: 120, easing: Easing.in(Easing.quad), useNativeDriver: true }),
-    ]).start(() => {
-      setModalVisible(false);
-      setSelected(null);
-    });
+    setModalVisible(false);
+    // setSelected(null); // Delay clearing selected until modal is hidden (Paper Modal animation)
+    // Actually, Paper Modal doesn't have a callback for "fully hidden".
+    // We can just keep selected or clear it. If we clear it immediately, the modal content might flicker to empty before closing.
+    // So let's NOT clear selected here, or clear it after a timeout.
+    // For now, just close it.
   }, []);
 
   const openAdd = useCallback((day: number, slot: number) => {
     setAddTarget({ day, slot });
     setAddTitle('');
     setAddRoom('');
+    setAddTeacher('');
+    setAddType('schedule');
     setAddWeeks([active + 1]); // 默认选择当前周
     setAddVisible(true);
     addFade.setValue(0);
@@ -318,6 +451,29 @@ export default function CourseTable() {
     });
   }, []);
 
+  // 监听硬件返回键
+  useEffect(() => {
+    const onBackPress = () => {
+      if (confirmVisible) {
+        closeConfirm();
+        return true;
+      }
+      if (addVisible) {
+        closeAdd();
+        return true;
+      }
+      if (modalVisible) {
+        closeModal();
+        return true;
+      }
+      return false;
+    };
+
+    const subscription = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+
+    return () => subscription.remove();
+  }, [confirmVisible, addVisible, modalVisible, closeConfirm, closeAdd, closeModal]);
+
   const toggleWeek = (w: number) => {
     setAddWeeks((prev) => (prev.includes(w) ? prev.filter((x) => x !== w) : [...prev, w].sort((a, b) => a - b)));
   };
@@ -327,16 +483,19 @@ export default function CourseTable() {
     const slot = addTarget.slot;
     const startPeriod = slot === 0 ? 1 : slot === 1 ? 3 : slot === 2 ? 5 : slot === 3 ? 7 : 9;
     const endPeriod = startPeriod + 1;
-    const newItem = {
+    const newItem: CourseEntry = {
       name: addTitle.trim(),
       room: addRoom.trim(),
-      teacher: '',
+      teacher: addTeacher.trim(),
+      weeks: { start: 1, end: maxWeek },
       day: addTarget.day + 1, // cIdx starts from 0, day uses 1..7
       startPeriod,
       endPeriod,
       odd: false,
       even: false,
       weeksList: addWeeks.slice(),
+      timeRaw: '',
+      isCustom: addType === 'schedule',
     };
     setCustoms((prev) => [...prev, newItem]);
     closeAdd();
@@ -363,8 +522,8 @@ export default function CourseTable() {
     }
   };
 
-  const isSuppressed = (course: any, week: number) => {
-    const keyMatch = (s: any) =>
+  const isSuppressed = (course: CourseEntry, week: number) => {
+    const keyMatch = (s: Suppression) =>
       s.name === course.name &&
       s.day === course.day &&
       s.startPeriod === course.startPeriod &&
@@ -382,14 +541,14 @@ export default function CourseTable() {
         return prev
           .map(item => {
             if (item !== selected) return item;
-            const rest = item.weeksList.filter((w: number) => !deleteWeeks.includes(w));
-            if (rest.length === 0) return null as any;
+            const rest = item.weeksList?.filter((w) => !deleteWeeks.includes(w)) ?? [];
+            if (rest.length === 0) return null;
             return { ...item, weeksList: rest };
           })
-          .filter(Boolean);
+          .filter((item): item is CourseEntry => item !== null);
       });
     } else {
-      const keyMatch = (s: any) =>
+      const keyMatch = (s: Suppression) =>
         s.name === selected.name &&
         s.day === selected.day &&
         s.startPeriod === selected.startPeriod &&
@@ -425,6 +584,117 @@ export default function CourseTable() {
   const curWeekIndex = Math.min(maxWeek, Math.max(1, computeCurrentWeek())) - 1;
   const [hoverThisWeek, setHoverThisWeek] = useState(false);
 
+  const renderedWeeks = useMemo(() => weeks.map((grid, idx) => {
+    const dates = getWeekDates(idx + 1);
+    const mon = mondayOfWeek(idx + 1);
+    const today = new Date();
+    const pageHeight = Math.max(400, height - 24 - insets.top);
+    return (
+      <View key={idx} style={{ width }}>
+        <View style={styles.grid}>
+          {/* 固定表头 */}
+          <View style={[styles.headerRow]}>
+            <View style={[styles.headerCell, styles.timeCell]}>
+              <Text style={styles.headerWeekText}>第{idx + 1}周</Text>
+              <Text style={styles.headerWeekSub}>共{maxWeek}周</Text>
+            </View>
+            {['周一','周二','周三','周四','周五','周六','周日'].map((d, i) => {
+              const cur = new Date(mon.getFullYear(), mon.getMonth(), mon.getDate() + i);
+              const isToday = isSameDay(cur, today);
+              return (
+                <View key={i} style={[styles.headerCell, isToday && styles.headerCellToday]}>
+                  <Text style={[styles.headerText, isToday && styles.headerToday]}>{d}</Text>
+                  <Text style={[styles.dateText, isToday && styles.headerToday]}>{dates[i]}</Text>
+                </View>
+              );
+            })}
+          </View>
+
+          {/* 可滚动课程内容 */}
+          <ScrollView
+            style={{ maxHeight: pageHeight }}
+            nestedScrollEnabled
+            showsVerticalScrollIndicator
+          >
+            {grid.map((row, rIdx) => (
+              <View key={rIdx} style={styles.row}>
+                <View style={[styles.cell, styles.timeCell]}>
+                  <View style={styles.timeSlot}>
+                    <Text style={styles.timeValue}>{COURSE_TIMES[rIdx * 2]?.start}</Text>
+                    <Text style={styles.timeIndex}>{rIdx * 2 + 1}</Text>
+                    <Text style={styles.timeValue}>{COURSE_TIMES[rIdx * 2]?.end}</Text>
+                  </View>
+                  <View style={styles.timeSlot}>
+                    <Text style={styles.timeValue}>{COURSE_TIMES[rIdx * 2 + 1]?.start}</Text>
+                    <Text style={styles.timeIndex}>{rIdx * 2 + 2}</Text>
+                    <Text style={styles.timeValue}>{COURSE_TIMES[rIdx * 2 + 1]?.end}</Text>
+                  </View>
+                </View>
+                {row.map((cell, cIdx) => {
+                  const course = cell[0];
+                  const colors = course ? getCourseColor(course.name) : null;
+                  const isArmed = armedCell && armedCell.c === cIdx && armedCell.r === rIdx;
+                  return (
+                    <View key={cIdx} style={styles.cell}>
+                      {cell.length > 0 ? (
+                        <Pressable
+                          onPress={() => openModal(cell[0])}
+                          style={({ pressed }) => [
+                            { flex: 1 },
+                            pressed && {
+                              transform: [{ scale: 0.95 }], // 仅保留轻微缩放，移除透明度变化
+                            }
+                          ]}
+                        >
+                          <View style={[styles.card, { backgroundColor: colors?.bg }]}>
+                            <Text numberOfLines={4} style={[styles.cardTitle, { color: colors?.text, backgroundColor: 'transparent' }]}>{cell[0].name}</Text>
+                            {!!cell[0].room && <Text numberOfLines={2} style={[styles.cardDesc, { color: colors?.text, backgroundColor: 'transparent' }]}>{cell[0].room}</Text>}
+                            {!!cell[0].teacher && <Text numberOfLines={1} style={[styles.cardDesc, { color: colors?.text, backgroundColor: 'transparent' }]}>{cell[0].teacher}</Text>}
+                          </View>
+                        </Pressable>
+                      ) : (
+                        <Pressable 
+                          style={[
+                            styles.emptyHit, 
+                            isArmed && { 
+                              backgroundColor: theme.colors.primaryContainer + '20', // 极淡的背景色
+                              borderRadius: 8 
+                            }
+                          ]} 
+                          onPress={() => handleEmptyCellPress(cIdx, rIdx)}
+                        >
+                          {isArmed ? (
+                            <View style={[styles.plusBtn, { backgroundColor: theme.colors.primary, shadowColor: theme.colors.shadow }]}>
+                              <MaterialCommunityIcons name="plus" size={20} color={theme.colors.onPrimary} />
+                            </View>
+                          ) : null}
+                        </Pressable>
+                      )}
+                    </View>
+                  );
+                })}
+              </View>
+            ))}
+          </ScrollView>
+        </View>
+        {idx !== curWeekIndex ? (
+          <Pressable
+            onHoverIn={() => setHoverThisWeek(true)}
+            onHoverOut={() => setHoverThisWeek(false)}
+            style={[
+              styles.thisWeekBtnWrap,
+              Platform.OS === 'web' ? { opacity: hoverThisWeek ? 1 : 0 } : { opacity: 1 },
+            ]}
+          >
+            <Pressable onPress={goThisWeek} style={[styles.thisWeekBtn, { backgroundColor: theme.colors.primary }]}>
+              <MaterialCommunityIcons name="undo" size={22} color={theme.colors.onPrimary} />
+            </Pressable>
+          </Pressable>
+        ) : null}
+      </View>
+    );
+  }), [weeks, curWeekIndex, armedCell, hoverThisWeek, openModal, handleEmptyCellPress, goThisWeek, width, height, insets, theme]);
+
   return (
     <View style={styles.wrap}>
       <ScrollView
@@ -444,139 +714,17 @@ export default function CourseTable() {
         }}
         showsHorizontalScrollIndicator={false}
       >
-        {weeks.map((grid, idx) => {
-          const dates = getWeekDates(idx + 1);
-          const mon = mondayOfWeek(idx + 1);
-          const today = new Date();
-          const pageHeight = Math.max(400, height - 24 - insets.top);
-          return (
-            <View key={idx} style={{ width }}>
-              <ScrollView
-                style={{ maxHeight: pageHeight }}
-                nestedScrollEnabled
-                showsVerticalScrollIndicator
-              >
-                <View style={styles.grid}>
-                  <View style={[styles.headerRow]}>
-                    <View style={[styles.headerCell, styles.timeCell]}>
-                      <Text style={styles.headerWeekText}>第{idx + 1}周</Text>
-                      <Text style={styles.headerWeekSub}>共{maxWeek}周</Text>
-                    </View>
-                    {['周一','周二','周三','周四','周五','周六','周日'].map((d, i) => {
-                      const cur = new Date(mon.getFullYear(), mon.getMonth(), mon.getDate() + i);
-                      const isToday = isSameDay(cur, today);
-                      return (
-                        <View key={i} style={styles.headerCell}>
-                          <Text style={[styles.headerText, isToday && styles.headerToday]}>{d}</Text>
-                          <Text style={[styles.dateText, isToday && styles.headerToday]}>{dates[i]}</Text>
-                        </View>
-                      );
-                    })}
-                  </View>
-                  {grid.map((row, rIdx) => (
-                    <View key={rIdx} style={styles.row}>
-                      <View style={[styles.cell, styles.timeCell]}>
-                        <Text style={styles.timeText}>{['1-2节','3-4节','5-6节','7-8节','9-10节'][rIdx]}</Text>
-                      </View>
-                      {row.map((cell, cIdx) => (
-                        <View key={cIdx} style={styles.cell}>
-                          {cell.length > 0 ? (
-                            <TouchableOpacity activeOpacity={0.9} onPress={() => openModal(cell[0])}>
-                              <View style={styles.card}>
-                                <Text numberOfLines={3} style={styles.cardTitle}>{cell[0].name}</Text>
-                                {!!cell[0].room && <Text numberOfLines={1} style={styles.cardDesc}>{cell[0].room}</Text>}
-                                {!!cell[0].teacher && <Text numberOfLines={1} style={styles.cardDesc}>{cell[0].teacher}</Text>}
-                              </View>
-                            </TouchableOpacity>
-                          ) : (
-                            <Pressable style={styles.emptyHit} onPress={() => handleEmptyCellPress(cIdx, rIdx)}>
-                              {armedCell && armedCell.c === cIdx && armedCell.r === rIdx ? (
-                                <View style={styles.plusWrap}>
-                                  <Text style={styles.plus}>＋</Text>
-                                </View>
-                              ) : null}
-                            </Pressable>
-                          )}
-                        </View>
-                      ))}
-                    </View>
-                  ))}
-                </View>
-              </ScrollView>
-              {idx !== curWeekIndex ? (
-                <Pressable
-                  onHoverIn={() => setHoverThisWeek(true)}
-                  onHoverOut={() => setHoverThisWeek(false)}
-                  style={[
-                    styles.thisWeekBtnWrap,
-                    Platform.OS === 'web' ? { opacity: hoverThisWeek ? 1 : 0 } : { opacity: 1 },
-                  ]}
-                >
-                  <Pressable onPress={goThisWeek} style={[styles.thisWeekBtn, { backgroundColor: theme.colors.primary }]}>
-                    <MaterialCommunityIcons name="undo" size={22} color={theme.colors.onPrimary} />
-                  </Pressable>
-                </Pressable>
-              ) : null}
-            </View>
-          );
-        })}
+        {renderedWeeks}
       </ScrollView>
 
-      {modalVisible ? (
-        <View pointerEvents="auto" style={styles.overlay}>
-          <Pressable onPress={closeModal} style={StyleSheet.absoluteFill}>
-            <Animated.View style={[styles.backdrop, { opacity: fade }]} />
-          </Pressable>
-          <Animated.View style={[styles.modal, { opacity: fade, transform: [{ scale }] }]}>
-            <Text style={styles.modalTitle}>{selected?.name || '课程'}</Text>
-            {!!selected?.teacher && <Text style={styles.modalText}>教师：{selected.teacher}</Text>}
-            {!!selected?.room && <Text style={styles.modalText}>教室：{selected.room}</Text>}
-            <Text style={styles.modalText}>
-              周次：{selected?.weeks?.start}-{selected?.weeks?.end}{selected?.odd ? '（单周）' : ''}{selected?.even ? '（双周）' : ''}
-            </Text>
-            <Text style={styles.modalText}>
-              时间：周{selected?.day} 第{selected?.startPeriod}-{selected?.endPeriod}节
-            </Text>
-            {selected ? (
-              <>
-                <Text style={[styles.modalText, { marginTop: 12 }]}>选择要删除的周次</Text>
-                <View style={styles.weekChips}>
-                  {weeksOfCourse(selected, maxWeek).map((w: number) => {
-                    const on = deleteWeeks.includes(w);
-                    return (
-                      <Chip
-                        key={`del-${w}`}
-                        selected={on}
-                        onPress={() =>
-                          setDeleteWeeks(prev =>
-                            prev.includes(w) ? prev.filter(x => x !== w) : [...prev, w].sort((a, b) => a - b),
-                          )
-                        }
-                        compact
-                        style={[styles.chip, on && styles.chipSelected]}
-                      >
-                        {w}
-                      </Chip>
-                    );
-                  })}
-                </View>
-                <View style={styles.modalActionsRow}>
-                  <Button onPress={() => setDeleteWeeks([])}>清空</Button>
-                  <Button onPress={() => setDeleteWeeks(weeksOfCourse(selected, maxWeek))}>全选</Button>
-                  <View style={{ flex: 1 }} />
-                  <Button
-                    mode="contained"
-                    disabled={deleteWeeks.length === 0}
-                    onPress={openConfirm}
-                  >
-                    删除所选周次
-                  </Button>
-                </View>
-              </>
-            ) : null}
-          </Animated.View>
-        </View>
-      ) : null}
+      <CourseDetailModal
+        visible={modalVisible}
+        course={selected}
+        attendance={selected ? (attendanceData[selected.name] || { present: 0, late: 0, absent: 0 }) : { present: 0, late: 0, absent: 0 }}
+        onClose={closeModal}
+        onDelete={openConfirm}
+        onUpdateAttendance={handleUpdateAttendance}
+      />
 
       {addVisible ? (
         <View pointerEvents="auto" style={styles.overlay}>
@@ -585,6 +733,23 @@ export default function CourseTable() {
           </Pressable>
           <Animated.View style={[styles.modal, { opacity: addFade, transform: [{ scale: addScale }] }]}>
             <Text style={styles.modalTitle}>添加日程</Text>
+            <View style={{ flexDirection: 'row', marginBottom: 12 }}>
+              <Chip
+                selected={addType === 'schedule'}
+                onPress={() => setAddType('schedule')}
+                style={{ marginRight: 8 }}
+                showSelectedOverlay
+              >
+                日程
+              </Chip>
+              <Chip
+                selected={addType === 'course'}
+                onPress={() => setAddType('course')}
+                showSelectedOverlay
+              >
+                课程
+              </Chip>
+            </View>
             <TextInput
               mode="outlined"
               label="标题"
@@ -599,6 +764,15 @@ export default function CourseTable() {
               onChangeText={setAddRoom}
               style={{ marginBottom: 8 }}
             />
+            {addType === 'course' && (
+              <TextInput
+                mode="outlined"
+                label="教师"
+                value={addTeacher}
+                onChangeText={setAddTeacher}
+                style={{ marginBottom: 8 }}
+              />
+            )}
             <Text style={[styles.modalText, { marginBottom: 6 }]}>选择周次</Text>
             <View style={styles.weekChips}>
               {Array.from({ length: maxWeek }).map((_, i) => {
@@ -656,14 +830,44 @@ export default function CourseTable() {
           </Animated.View>
         </View>
       ) : null}
+
+      {/* 错误提示 Snackbar */}
+      <Snackbar
+        visible={!!errorMsg}
+        onDismiss={() => setErrorMsg(null)}
+        duration={3000}
+        action={{
+          label: '重试',
+          onPress: fetchSchedule,
+        }}
+      >
+        {errorMsg}
+      </Snackbar>
+
+      {/* 加载中指示器 */}
+      {loading && (
+        <View style={styles.loadingContainer} pointerEvents="none">
+          <ActivityIndicator animating={true} size="large" color={theme.colors.primary} />
+        </View>
+      )}
     </View>
   );
 }
 
-const styles = StyleSheet.create({
-  wrap: {
+export default observer(CourseTable);
+
+function createStyles(theme: MD3Theme) {
+  return StyleSheet.create({
+    loadingContainer: {
+      ...StyleSheet.absoluteFillObject,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: 'rgba(255,255,255,0.6)',
+      zIndex: 1000,
+    },
+    wrap: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: theme.colors.background,
   },
   toolbar: {
     paddingHorizontal: 12,
@@ -681,84 +885,133 @@ const styles = StyleSheet.create({
   },
   grid: {
     flex: 1,
-    marginHorizontal: 12,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: '#e1e5ea',
+    marginHorizontal: 4,
     borderRadius: 12,
     overflow: 'hidden',
   },
   headerRow: {
     flexDirection: 'row',
-    backgroundColor: '#f6f8fa',
+    backgroundColor: 'transparent',
+    marginBottom: 4,
   },
   row: {
     flexDirection: 'row',
     flex: 1,
+    minHeight: 120,
+    marginBottom: 2,
   },
   headerCell: {
     flex: 1,
     paddingVertical: 10,
-    paddingHorizontal: 6,
-    borderRightWidth: StyleSheet.hairlineWidth,
-    borderColor: '#e1e5ea',
+    paddingHorizontal: 2,
     alignItems: 'center',
     justifyContent: 'center',
   },
+  headerCellToday: {
+    backgroundColor: theme.colors.primaryContainer + '40', // 25% opacity
+    borderRadius: 8,
+  },
   cell: {
     flex: 1,
-    padding: 8,
-    borderRightWidth: StyleSheet.hairlineWidth,
-    borderColor: '#e1e5ea',
+    padding: 2,
     justifyContent: 'center',
   },
   timeCell: {
-    width: 45,
+    width: 36,
     flex: 0,
+    paddingHorizontal: 0,
+    justifyContent: 'center',
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  timeSlot: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  timeIndex: {
+    fontSize: 13,
+    fontWeight: 'bold',
+    color: theme.colors.onSurfaceVariant,
+    lineHeight: 16,
+    marginVertical: 2,
+  },
+  timeValue: {
+    fontSize: 9,
+    color: theme.colors.onSurfaceVariant,
+    opacity: 0.6,
+    transform: [{ scale: 0.85 }],
+    lineHeight: 10,
   },
   headerText: {
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '600',
+    color: theme.colors.onSurfaceVariant,
+    textAlign: 'center',
   },
   headerWeekText: {
     fontSize: 10,
     fontWeight: '700',
+    color: theme.colors.onSurfaceVariant,
   },
   headerWeekSub: {
     fontSize: 10,
-    opacity: 0.7,
+    opacity: 0.6,
     marginTop: 2,
+    color: theme.colors.onSurfaceVariant,
   },
   dateText: {
     fontSize: 11,
-    opacity: 0.7,
+    opacity: 0.8,
     marginTop: 2,
+    color: theme.colors.onSurfaceVariant,
   },
   headerToday: {
-    color: '#0A7C59',
-    fontWeight: '700',
+    color: theme.colors.primary,
+    fontWeight: 'bold',
   },
   timeText: {
-    fontSize: 13,
+    fontSize: 12,
+    color: theme.colors.onSurfaceVariant,
+    textAlign: 'center',
+    marginBottom: 4,
+    fontWeight: '500',
   },
   card: {
-    backgroundColor: '#eef6f3',
-    borderRadius: 8,
-    paddingVertical: 10,
-    paddingHorizontal: 10,
+    flex: 1,
+    borderRadius: 8, // 稍微减小圆角，让空间利用率更高
+    paddingVertical: 4, // 减小垂直内边距
+    paddingHorizontal: 4, // 减小水平内边距
     minHeight: 56,
+    justifyContent: 'center',
+    // Shadow for iOS
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 1,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    // Elevation for Android
+    elevation: 2,
   },
   cardTitle: {
-    fontSize: 14,
-    fontWeight: '600',
+    fontSize: 10, // 缩小字体
+    fontWeight: 'bold',
+    textAlign: 'center',
+    marginBottom: 2, // 减小间距
+    lineHeight: 13, // 紧凑行高
   },
   cardDesc: {
-    fontSize: 12,
-    opacity: 0.7,
-    marginTop: 2,
+    fontSize: 9, // 缩小字体
+    opacity: 0.85,
+    marginTop: 1,
+    textAlign: 'center',
+    lineHeight: 11, // 紧凑行高
   },
   emptyCell: {
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: '#e8ecef',
+    borderColor: theme.colors.outlineVariant ?? theme.colors.outline,
     borderStyle: 'dashed',
     borderRadius: 8,
     paddingVertical: 10,
@@ -768,22 +1021,23 @@ const styles = StyleSheet.create({
   },
   emptyHint: {
     fontSize: 12,
-    color: '#9aa4ad',
+    color: theme.colors.onSurfaceVariant,
   },
   emptyHit: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  plusWrap: {
-    alignSelf: 'center',
-    alignItems: 'center',
+  plusBtn: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
     justifyContent: 'center',
-    paddingVertical: 8,
-  },
-  plus: {
-    fontSize: 22,
-    color: '#9aa4ad',
+    alignItems: 'center',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 3,
+    elevation: 4,
   },
   overlay: {
     position: 'absolute',
@@ -805,7 +1059,7 @@ const styles = StyleSheet.create({
   modal: {
     width: '84%',
     borderRadius: 14,
-    backgroundColor: '#fff',
+    backgroundColor: theme.colors.surface,
     paddingVertical: 16,
     paddingHorizontal: 14,
   },
@@ -813,10 +1067,12 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700',
     marginBottom: 8,
+    color: theme.colors.onSurface,
   },
   modalText: {
     fontSize: 14,
     marginTop: 6,
+    color: theme.colors.onSurfaceVariant,
   },
   modalActions: {
     marginTop: 14,
@@ -832,7 +1088,7 @@ const styles = StyleSheet.create({
     marginVertical: 4,
   },
   chipSelected: {
-    backgroundColor: '#e6f4ef',
+    backgroundColor: theme.colors.secondaryContainer,
   },
   modalActionsRow: {
     marginTop: 10,
@@ -859,4 +1115,5 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 0,
     borderBottomRightRadius: 0,
   },
-});
+  });
+}

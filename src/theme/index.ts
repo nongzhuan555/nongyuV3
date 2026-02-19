@@ -26,6 +26,8 @@ const BRAND_PALETTES: Record<
   {
     primary: string;
     onPrimary: string;
+    primaryContainer: string;
+    onPrimaryContainer: string;
     secondary: string;
     onSecondary: string;
     tertiary: string;
@@ -33,13 +35,25 @@ const BRAND_PALETTES: Record<
     onBackground: string;
     surface: string;
     onSurface: string;
+    surfaceVariant: string;
+    onSurfaceVariant: string;
     outline: string;
+    elevation: {
+      level0: string;
+      level1: string;
+      level2: string;
+      level3: string;
+      level4: string;
+      level5: string;
+    };
   }
 > = {
   // 为兼容历史存储值，default 等同于 green
   default: {
     primary: '#0A7C59',
     onPrimary: '#FFFFFF',
+    primaryContainer: '#D4E9DF',
+    onPrimaryContainer: '#042116',
     secondary: '#2E7D6E',
     onSecondary: '#FFFFFF',
     tertiary: '#8FBF9B',
@@ -47,11 +61,23 @@ const BRAND_PALETTES: Record<
     onBackground: '#111827',
     surface: '#FFFFFF',
     onSurface: '#1F2937',
+    surfaceVariant: '#DEE5E1', // 增加表面变体色
+    onSurfaceVariant: '#424945',
     outline: '#CFE3DA',
+    elevation: {
+      level0: 'transparent',
+      level1: '#F3F6F4',
+      level2: '#EDF2EF',
+      level3: '#E6EEE9',
+      level4: '#E0ECE5',
+      level5: '#D9E7E0',
+    },
   },
   green: {
     primary: '#0A7C59',
     onPrimary: '#FFFFFF',
+    primaryContainer: '#D4E9DF',
+    onPrimaryContainer: '#042116',
     secondary: '#2E7D6E',
     onSecondary: '#FFFFFF',
     tertiary: '#8FBF9B',
@@ -59,11 +85,23 @@ const BRAND_PALETTES: Record<
     onBackground: '#111827',
     surface: '#FFFFFF',
     onSurface: '#1F2937',
+    surfaceVariant: '#DEE5E1', // 增加表面变体色
+    onSurfaceVariant: '#424945',
     outline: '#CFE3DA',
+    elevation: {
+      level0: 'transparent',
+      level1: '#F3F6F4',
+      level2: '#EDF2EF',
+      level3: '#E6EEE9',
+      level4: '#E0ECE5',
+      level5: '#D9E7E0',
+    },
   },
   sakura: {
     primary: '#FFB7C5',
     onPrimary: '#3A2A31',
+    primaryContainer: '#FFD8E4',
+    onPrimaryContainer: '#3E001D',
     secondary: '#F8BBD0',
     onSecondary: '#3A2A31',
     tertiary: '#FFE4EC',
@@ -71,7 +109,17 @@ const BRAND_PALETTES: Record<
     onBackground: '#3A2A31',
     surface: '#FFFFFF',
     onSurface: '#3A2A31',
+    surfaceVariant: '#F2DDE1', // 增加表面变体色
+    onSurfaceVariant: '#514347',
     outline: '#F4D8E3',
+    elevation: {
+      level0: 'transparent',
+      level1: '#FFF8F9',
+      level2: '#FFF2F5',
+      level3: '#FFEBF0',
+      level4: '#FFE5EB',
+      level5: '#FFDEE7',
+    },
   },
 };
 
@@ -82,23 +130,33 @@ function buildPaperTheme(isDark: boolean, brand: BrandName): MD3Theme {
   const lightExtras = !isDark
     ? {
         primary: palette.primary,
+        primaryContainer: palette.primaryContainer,
+        onPrimaryContainer: palette.onPrimaryContainer,
         secondary: palette.secondary,
         tertiary: palette.tertiary,
         background: palette.background,
         surface: palette.surface,
         onBackground: palette.onBackground,
         onSurface: palette.onSurface,
+        surfaceVariant: palette.surfaceVariant,
+        onSurfaceVariant: palette.onSurfaceVariant,
         outline: palette.outline,
+        elevation: palette.elevation,
       }
     : {};
-  // 深色模式：保留MD3暗色对比，同时同步品牌主色与部分强调色
   const darkExtras = isDark
     ? {
         primary: palette.primary,
         secondary: palette.secondary,
-        outline: '#3F3F46',
-        background: '#121212',
-        surface: '#1C1C1F',
+        tertiary: palette.tertiary,
+        background: '#0B0F14',
+        surface: '#121722',
+        surfaceVariant: '#1A2230',
+        onBackground: '#E6EAF0',
+        onSurface: '#E6EAF0',
+        onSurfaceVariant: '#C9D1DB',
+        outline: '#2B3544',
+        outlineVariant: '#1F2835',
       }
     : {};
   return {
@@ -120,8 +178,11 @@ function buildNavigationTheme(isDark: boolean, paperTheme: MD3Theme): Navigation
     ...base,
     colors: {
       ...base.colors,
-      // 与 Paper 主题主色保持一致，便于导航条/高亮效果与品牌色统一
       primary: paperTheme.colors.primary,
+      background: paperTheme.colors.background,
+      card: paperTheme.colors.surface,
+      text: paperTheme.colors.onSurface,
+      border: paperTheme.colors.outlineVariant ?? paperTheme.colors.outline,
     },
   };
 }

@@ -1,0 +1,51 @@
+0 verbose cli E:\node\node.exe E:\node\node_modules\npm\bin\npm-cli.js
+1 info using npm@11.8.0
+2 info using node@v24.13.1
+3 silly config load:file:E:\node\node_modules\npm\npmrc
+4 silly config load:file:C:\Users\TANGLEI\Desktop\nongyu\.npmrc
+5 silly config load:file:C:\Users\TANGLEI\.npmrc
+6 silly config load:file:E:\node\node_global\etc\npmrc
+7 verbose title npm install react-native-wechat-lib
+8 verbose argv "install" "react-native-wechat-lib" "--save" "--cache" "./.npm-cache" "--no-audit"
+9 verbose logfile logs-max:10 dir:C:\Users\TANGLEI\Desktop\nongyu\.npm-cache\_logs\2026-02-19T13_13_14_646Z-
+10 verbose logfile C:\Users\TANGLEI\Desktop\nongyu\.npm-cache\_logs\2026-02-19T13_13_14_646Z-debug-0.log
+11 silly logfile done cleaning log files
+12 silly packumentCache heap:4496293888 maxSize:1124073472 maxEntrySize:562036736
+13 silly idealTree buildDeps
+14 silly fetch manifest react-native-wechat-lib@*
+15 silly packumentCache full:https://registry.npmjs.org/react-native-wechat-lib cache-miss
+16 http fetch GET 200 https://registry.npmjs.org/react-native-wechat-lib 1480ms (cache miss)
+17 silly packumentCache full:https://registry.npmjs.org/react-native-wechat-lib set size:undefined disposed:false
+18 silly fetch manifest react-native@0.81.5
+19 silly packumentCache full:https://registry.npmjs.org/react-native cache-miss
+20 http fetch GET 200 https://registry.npmjs.org/react-native 1806ms (cache updated)
+21 silly packumentCache full:https://registry.npmjs.org/react-native set size:undefined disposed:false
+22 silly fetch manifest @types/react@~19.1.0
+23 silly packumentCache full:https://registry.npmjs.org/@types%2freact cache-miss
+24 http fetch GET 200 https://registry.npmjs.org/@types%2freact 337ms (cache revalidated)
+25 silly packumentCache full:https://registry.npmjs.org/@types%2freact set size:2588986 disposed:false
+26 silly fetch manifest react@19.1.0
+27 silly packumentCache full:https://registry.npmjs.org/react cache-miss
+28 http fetch GET 200 https://registry.npmjs.org/react 3764ms (cache updated)
+29 silly packumentCache full:https://registry.npmjs.org/react set size:undefined disposed:false
+30 silly placeDep ROOT react-native-wechat-lib@1.1.27 OK for: nongyu@1.0.0 want: *
+31 silly fetch manifest events@1.0.1
+32 silly packumentCache full:https://registry.npmjs.org/events cache-miss
+33 http fetch GET 200 https://registry.npmjs.org/events 284ms (cache miss)
+34 silly packumentCache full:https://registry.npmjs.org/events set size:undefined disposed:false
+35 silly placeDep ROOT events@1.0.1 OK for: react-native-wechat-lib@1.1.27 want: 1.0.1
+36 silly reify moves {}
+37 http cache react-native-wechat-lib@https://registry.npmjs.org/react-native-wechat-lib/-/react-native-wechat-lib-1.1.27.tgz 0ms (cache hit)
+38 http cache events@https://registry.npmjs.org/events/-/events-1.0.1.tgz 0ms (cache hit)
+39 silly tarball no local data for react-native-wechat-lib@https://registry.npmjs.org/react-native-wechat-lib/-/react-native-wechat-lib-1.1.27.tgz. Extracting by manifest.
+40 silly tarball no local data for events@https://registry.npmjs.org/events/-/events-1.0.1.tgz. Extracting by manifest.
+41 http fetch GET 200 https://registry.npmjs.org/events/-/events-1.0.1.tgz 1272ms (cache miss)
+42 http fetch GET 200 https://registry.npmjs.org/react-native-wechat-lib/-/react-native-wechat-lib-1.1.27.tgz 2523ms (cache miss)
+43 silly ADD node_modules/events
+44 silly ADD node_modules/react-native-wechat-lib
+45 verbose cwd C:\Users\TANGLEI\Desktop\nongyu
+46 verbose os Windows_NT 10.0.26100
+47 verbose node v24.13.1
+48 verbose npm  v11.8.0
+49 verbose exit 0
+50 info ok

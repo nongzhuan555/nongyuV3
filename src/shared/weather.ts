@@ -2,11 +2,20 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import http from '@/shared/http';
 
 export interface WeatherInfo {
+  // 天气现象中文摘要
   summary: string;
+  // 可选温度展示
   temp?: string;
 }
 
 type CampusKey = '雅安校区' | '成都校区' | '都江堰校区';
+
+type WeatherApiResponse = {
+  current_weather?: {
+    temperature?: number;
+    weathercode?: number;
+  };
+};
 
 const CAMPUS_COORDS: Record<CampusKey, { lat: number; lon: number }> = {
   雅安校区: { lat: 29.98, lon: 103.00 },
@@ -14,6 +23,7 @@ const CAMPUS_COORDS: Record<CampusKey, { lat: number; lon: number }> = {
   都江堰校区: { lat: 31.00, lon: 103.62 },
 };
 
+// 校区兜底选择，保证请求坐标可用
 function pickCoords(campus: string): { lat: number; lon: number; name: CampusKey } {
   if (campus in CAMPUS_COORDS) {
     const key = campus as CampusKey;
@@ -22,6 +32,7 @@ function pickCoords(campus: string): { lat: number; lon: number; name: CampusKey
   return { ...CAMPUS_COORDS['雅安校区'], name: '雅安校区' };
 }
 
+// Open-Meteo weathercode 转中文摘要
 function mapWeatherCodeToCN(code: number): string {
   if (code === 0) return '晴';
   if (code === 1) return '晴间多云';
@@ -48,12 +59,15 @@ function mapWeatherCodeToCN(code: number): string {
   return '多云';
 }
 
+// 缓存 key 以经纬度为维度
 function cacheKey(lat: number, lon: number) {
   return `weather:openmeteo:${lat.toFixed(2)},${lon.toFixed(2)}`;
 }
 
+// 本地缓存 TTL：30 分钟
 const TTL_MS = 30 * 60 * 1000;
 
+// 按校区拉取天气，带本地缓存与降级
 export async function getWeatherByCampus(campus: string): Promise<WeatherInfo> {
   const { lat, lon } = pickCoords(campus);
   const key = cacheKey(lat, lon);
@@ -67,8 +81,9 @@ export async function getWeatherByCampus(campus: string): Promise<WeatherInfo> {
 
   try {
     const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current_weather=true&timezone=Asia%2FShanghai`;
-    const resp = await http.get(url);
+    const resp = await http.get<WeatherApiResponse>(url);
     const cw = resp?.data?.current_weather;
+    // 温度与天气摘要做基础容错
     const temp = typeof cw?.temperature === 'number' ? `${Math.round(cw.temperature)}℃` : undefined;
     const code = typeof cw?.weathercode === 'number' ? cw.weathercode : -1;
     const summary = mapWeatherCodeToCN(code);
@@ -82,10 +97,11 @@ export async function getWeatherByCampus(campus: string): Promise<WeatherInfo> {
   }
 }
 
-export async function getWeatherDebugByCampus(campus: string): Promise<{ info: WeatherInfo; raw: any }> {
+// 调试用途：返回原始响应体
+export async function getWeatherDebugByCampus(campus: string): Promise<{ info: WeatherInfo; raw: unknown }> {
   const { lat, lon } = pickCoords(campus);
   const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current_weather=true&timezone=Asia%2FShanghai`;
-  const resp = await http.get(url);
+  const resp = await http.get<WeatherApiResponse>(url);
   const cw = resp?.data?.current_weather;
   const temp = typeof cw?.temperature === 'number' ? `${Math.round(cw.temperature)}℃` : undefined;
   const code = typeof cw?.weathercode === 'number' ? cw.weathercode : -1;

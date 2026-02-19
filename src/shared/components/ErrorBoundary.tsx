@@ -2,7 +2,7 @@ import React from 'react';
 import { View, StyleSheet } from 'react-native';
 import { Button, Text } from 'react-native-paper';
 
-type State = { hasError: boolean; error?: any };
+type State = { hasError: boolean; error?: unknown };
 
 export default class ErrorBoundary extends React.Component<React.PropsWithChildren, State> {
   constructor(props: React.PropsWithChildren) {
@@ -10,11 +10,11 @@ export default class ErrorBoundary extends React.Component<React.PropsWithChildr
     this.state = { hasError: false };
   }
 
-  static getDerivedStateFromError(error: any) {
+  static getDerivedStateFromError(error: Error) {
     return { hasError: true, error };
   }
 
-  componentDidCatch(error: any) {}
+  componentDidCatch(_error: Error, _info: React.ErrorInfo) {}
 
   handleRetry = () => {
     this.setState({ hasError: false, error: undefined });

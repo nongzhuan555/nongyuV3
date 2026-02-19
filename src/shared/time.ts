@@ -1,13 +1,16 @@
 export type TimeSlot = '凌晨' | '清晨' | '上午' | '中午' | '午后' | '傍晚' | '夜间';
 
+// 获取设备当前时间
 export function getDeviceTime(): Date {
   return new Date();
 }
 
+// 获取当前 ISO 时间字符串
 export function getISONow(): string {
   return new Date().toISOString();
 }
 
+// 根据小时划分时间段标签
 export function getTimeSlotLabel(d: Date = new Date()): TimeSlot {
   const h = d.getHours();
   if (h < 5) return '凌晨';

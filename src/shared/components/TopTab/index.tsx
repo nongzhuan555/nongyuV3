@@ -3,12 +3,19 @@ import { View, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from 'react-native-paper';
 
-export default function TopTab() {
+export default function TopTab({ backgroundColor }: { backgroundColor?: string }) {
   const insets = useSafeAreaInsets();
-  const theme = useTheme();
-  const outline = (theme as any).outline ?? '#e5e7eb';
+  const { colors } = useTheme();
   return (
-    <View style={[styles.wrap, { paddingTop: insets.top, backgroundColor: theme.colors.background, borderBottomColor: outline }]}>
+    <View
+      style={[
+        styles.wrap,
+        {
+          paddingTop: insets.top,
+          backgroundColor: backgroundColor ?? colors.background,
+        },
+      ]}
+    >
       <View style={styles.bar} />
     </View>
   );
@@ -16,7 +23,6 @@ export default function TopTab() {
 
 const styles = StyleSheet.create({
   wrap: {
-    borderBottomWidth: StyleSheet.hairlineWidth,
   },
   bar: {
     height: 10,

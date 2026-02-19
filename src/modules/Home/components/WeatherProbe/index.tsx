@@ -1,20 +1,21 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import { View, StyleSheet } from 'react-native';
-import { Button, Text, SegmentedButtons, ActivityIndicator, useTheme } from 'react-native-paper';
+import { Button, Text, SegmentedButtons, ActivityIndicator, useTheme, MD3Theme } from 'react-native-paper';
 import { getTimeSlotLabel } from '@/shared/time';
 import { getWeatherDebugByCampus } from '@/shared/weather';
 
 const CAMPUS_OPTIONS = ['雅安校区', '成都校区', '都江堰校区'] as const;
+type Campus = (typeof CAMPUS_OPTIONS)[number];
 
 export default function WeatherProbe() {
   const theme = useTheme();
-  const styles = useMemo(() => createStyles(), [theme.dark]);
+  const styles = useMemo(() => createStyles(theme), [theme]);
 
-  const [campus, setCampus] = useState<(typeof CAMPUS_OPTIONS)[number]>('雅安校区');
+  const [campus, setCampus] = useState<Campus>('雅安校区');
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<{ summary: string; temp?: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [raw, setRaw] = useState<any | null>(null);
+  const [raw, setRaw] = useState<unknown | null>(null);
 
   const slot = getTimeSlotLabel();
 
@@ -25,7 +26,7 @@ export default function WeatherProbe() {
       const { info, raw } = await getWeatherDebugByCampus(campus);
       setResult(info);
       setRaw(raw);
-    } catch (e) {
+    } catch {
       setError('获取失败');
     } finally {
       setLoading(false);
@@ -38,7 +39,10 @@ export default function WeatherProbe() {
 
       <SegmentedButtons
         value={campus}
-        onValueChange={(v) => setCampus(v as any)}
+        onValueChange={(v) => {
+          if (CAMPUS_OPTIONS.includes(v as Campus)) setCampus(v as Campus);
+          else setCampus('雅安校区');
+        }}
         buttons={CAMPUS_OPTIONS.map((c) => ({ value: c, label: c }))}
         style={styles.segment}
       />
@@ -66,7 +70,7 @@ export default function WeatherProbe() {
   );
 }
 
-function createStyles() {
+function createStyles(theme: MD3Theme) {
   return StyleSheet.create({
     wrap: {
       width: '100%',
@@ -95,14 +99,14 @@ function createStyles() {
     rawBox: {
       marginTop: 8,
       padding: 8,
-      backgroundColor: '#f6f8fa',
+      backgroundColor: theme.colors.surfaceVariant,
       borderRadius: 8,
     },
     rawText: {
       fontSize: 12,
     },
     err: {
-      color: '#d00',
+      color: theme.colors.error,
     },
   });
 }

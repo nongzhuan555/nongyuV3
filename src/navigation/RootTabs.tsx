@@ -1,7 +1,7 @@
 // 根部Tab导航：负责组织底部四个主要页面
 // 说明：当前仅连接到占位视图（Home/Course/Square/Profile），后续可替换为各自的Stack
 import React from 'react';
-import { View, TouchableOpacity, Text, StyleSheet, Animated, Easing } from 'react-native';
+import { View, TouchableOpacity, StyleSheet, Animated, Easing } from 'react-native';
 import { createBottomTabNavigator, BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '@react-navigation/native';
@@ -10,13 +10,21 @@ import Home from '@/modules/Home';
 import Course from '@/modules/Course';
 import Square from '@/modules/Square';
 import Profile from '@/modules/Profile';
+import { profileStore } from '@/stores/profile';
 import { RootTabParamList } from './types';
 
 const Tab = createBottomTabNavigator<RootTabParamList>();
 
 export default function RootTabs() {
+  const initialRouteName = profileStore.defaultCourse ? '课表' : '首页';
+  
   return (
-    <Tab.Navigator screenOptions={{ headerShown: false, tabBarShowLabel: false }} tabBar={(p) => <TabBar {...p} />}>
+    <Tab.Navigator
+      initialRouteName={initialRouteName}
+      screenOptions={{ headerShown: false, tabBarShowLabel: false }}
+      backBehavior="history"
+      tabBar={(p) => <TabBar {...p} />}
+    >
       <Tab.Screen name="首页" component={Home} />
       <Tab.Screen name="课表" component={Course} />
       <Tab.Screen name="广场" component={Square} />
@@ -25,7 +33,7 @@ export default function RootTabs() {
   );
 }
 
-function TabBar({ state, descriptors, navigation }: BottomTabBarProps) {
+function TabBar({ state, navigation }: BottomTabBarProps) {
   const insets = useSafeAreaInsets();
   const { colors } = useTheme();
 
@@ -54,9 +62,9 @@ function TabBar({ state, descriptors, navigation }: BottomTabBarProps) {
     const progress = progressesRef.current[index] || new Animated.Value(isFocused ? 1 : 0);
     // 未激活时更大，激活时稍小；并在激活时向上位移为标签腾挪空间
     const scale = progress.interpolate({ inputRange: [0, 1], outputRange: [1.1, 1.0] });
-    const iconTranslateY = progress.interpolate({ inputRange: [0, 1], outputRange: [0, -6] });
+    const iconTranslateY = progress.interpolate({ inputRange: [0, 1], outputRange: [0, -8] }); // 增加位移，给更大的文字留空间
     const labelOpacity = progress;
-    const labelTranslateY = progress.interpolate({ inputRange: [0, 1], outputRange: [6, 0] });
+    const labelTranslateY = progress.interpolate({ inputRange: [0, 1], outputRange: [8, 0] });
 
     const onPress = () => {
       const event = navigation.emit({ type: 'tabPress', target: route.key, canPreventDefault: true });
@@ -65,14 +73,14 @@ function TabBar({ state, descriptors, navigation }: BottomTabBarProps) {
       }
     };
 
-    const iconName =
+    const iconName: React.ComponentProps<typeof MaterialCommunityIcons>['name'] =
       route.name === '首页'
-        ? 'home-variant-outline'
+        ? 'home'
         : route.name === '课表'
-        ? 'calendar-month-outline'
+        ? 'calendar-month'
         : route.name === '广场'
-        ? 'forum-outline'
-        : 'account-outline';
+        ? 'forum'
+        : 'account';
 
     return (
       <TouchableOpacity
@@ -86,16 +94,16 @@ function TabBar({ state, descriptors, navigation }: BottomTabBarProps) {
       >
         <Animated.View style={[styles['tabbar__iconWrap'], { transform: [{ translateY: iconTranslateY }, { scale }] }]}>
           <Animated.View style={{ position: 'absolute', opacity: labelOpacity }}>
-            <MaterialCommunityIcons name={iconName as any} size={24} color={colors.primary as string} />
+            <MaterialCommunityIcons name={iconName} size={28} color={colors.primary} />
           </Animated.View>
           <Animated.View style={{ opacity: progress.interpolate({ inputRange: [0, 1], outputRange: [1, 0] }) }}>
-            <MaterialCommunityIcons name={iconName as any} size={24} color={colors.text as string} />
+            <MaterialCommunityIcons name={iconName} size={28} color={colors.text} />
           </Animated.View>
         </Animated.View>
         <Animated.Text
           style={[
             styles['tabbar__label'],
-            { color: colors.primary as string, opacity: labelOpacity, transform: [{ translateY: labelTranslateY }] },
+            { color: colors.primary, opacity: labelOpacity, transform: [{ translateY: labelTranslateY }] },
           ]}
         >
           {route.name}
@@ -114,7 +122,7 @@ function TabBar({ state, descriptors, navigation }: BottomTabBarProps) {
       <View
         style={[
           styles['tabbar__bar'],
-          { backgroundColor: colors.card, borderColor: (colors as any).border ?? 'rgba(0,0,0,0.06)' },
+          { backgroundColor: 'transparent', borderColor: 'transparent' },
         ]}
       >
         <View style={styles['tabbar__content']}>{items}</View>
@@ -128,33 +136,32 @@ const styles = StyleSheet.create({
     paddingTop: 6,
   },
   'tabbar__bar': {
-    marginHorizontal: 16,
-    borderRadius: 24,
+    marginHorizontal: 0, // 减小外边距，最大化宽度
+    borderRadius: 0, // 取消圆角，变为沉浸式底栏
     paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderWidth: StyleSheet.hairlineWidth,
-    shadowColor: '#000',
-    shadowOpacity: 0.06,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 6,
+    paddingHorizontal: 12, // 保持适度内边距
+    borderWidth: 0,
+    shadowOpacity: 0,
+    shadowRadius: 0,
+    shadowOffset: { width: 0, height: 0 },
+    elevation: 0,
   },
   'tabbar__content': {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 12,
+    paddingHorizontal: 24, // 增加内边距，使外侧Tab不贴边，且间距均匀
   },
   'tabbar__item': {
-    width: 68,
-    height: 56,
+    width: 64, // 收窄点击区域，显著增加视觉间距
+    height: 60,
     alignItems: 'center',
     justifyContent: 'center',
   },
   'tabbar__iconWrap': {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -164,6 +171,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     textAlign: 'center',
-    fontSize: 11,
+    fontSize: 12,
+    fontWeight: '500',
   },
 });

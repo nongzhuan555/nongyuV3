@@ -1,43 +1,50 @@
 import React, { useState } from 'react';
 import { View, StyleSheet, ScrollView } from 'react-native';
-import { Button, Text, TextInput } from 'react-native-paper';
+import { Button, Text, TextInput, useTheme } from 'react-native-paper';
 import cleanCourseHtml from '@/jiaowu/course/course';
 import axios from 'axios';
 import iconv from 'iconv-lite';
+import { Buffer } from 'buffer';
+import 'iconv-lite/encodings';
 
 export default function CourseCleaner() {
+  const theme = useTheme();
+  // 输入的原始 HTML 文本
   const [html, setHtml] = useState('');
+  // 清洗后的 JSON 文本
   const [jsonText, setJsonText] = useState('');
+  // 错误提示
   const [err, setErr] = useState<string | null>(null);
 
   const onClean = () => {
+    // 清空错误并尝试清洗
     setErr(null);
     try {
       const data = cleanCourseHtml(html);
       setJsonText(JSON.stringify(data, null, 2));
-    } catch (e: any) {
-      setErr(e?.message || '清洗失败');
+    } catch (e) {
+      const err = e as { message?: string } | null;
+      setErr(err?.message || '清洗失败');
     }
   };
 
   const loadDemo = async () => {
+    // 拉取教务示例页面并完成 GBK 解码
     setErr(null);
     setJsonText('');
     try {
       const url = 'https://jiaowu.sicau.edu.cn/xuesheng/gongxuan/gongxuan/kbbanji.asp?title_id1=4';
-      const resp = await axios.get(url, { responseType: 'arraybuffer' as any });
-      // 确保 Buffer 可用（在 RN 中引入 polyfill）
-      const { Buffer } = require('buffer');
-      if (!(global as any).Buffer) (global as any).Buffer = Buffer;
-      // iconv-lite 需要加载额外编码（gbk/gb2312 属于单字节中文编码）
-      // @ts-ignore
-      require('iconv-lite/encodings');
-      const buf: Buffer = Buffer.from(resp.data);
+      const resp = await axios.get<ArrayBuffer>(url, { responseType: 'arraybuffer' });
+      const globalObj = globalThis as { Buffer?: typeof Buffer };
+      if (!globalObj.Buffer) globalObj.Buffer = Buffer;
+      const buf = Buffer.from(resp.data);
       const text = iconv.decode(buf, 'gbk');
       setHtml(text);
       const data = cleanCourseHtml(text);
       setJsonText(JSON.stringify(data, null, 2));
-    } catch (e: any) {
+    } catch (e) {
+      const err = e as { message?: string } | null;
+      // 失败时回退到内置样例，保证页面可用
       const sample = `
       <html><body>
       <table border="1">
@@ -51,19 +58,19 @@ export default function CourseCleaner() {
         const data = cleanCourseHtml(sample);
         setJsonText(JSON.stringify(data, null, 2));
       } catch {}
-      setErr('在线获取示例源码失败，已使用内置示例。');
+      setErr(err?.message ? `在线获取示例源码失败：${err.message}` : '在线获取示例源码失败，已使用内置示例。');
     }
   };
 
   return (
-    <ScrollView contentContainerStyle={styles.wrap}>
-      <Text style={styles.title}>课程表清洗调试</Text>
+    <ScrollView contentContainerStyle={[styles.wrap, { backgroundColor: theme.colors.background }]}>
+      <Text style={[styles.title, { color: theme.colors.onSurface }]}>课程表清洗调试</Text>
       <TextInput
         label="粘贴教务页面HTML源码"
         mode="outlined"
         value={html}
         onChangeText={setHtml}
-        style={styles.input}
+        style={[styles.input, { backgroundColor: theme.colors.surface }]}
         multiline
         numberOfLines={8}
       />
@@ -75,10 +82,10 @@ export default function CourseCleaner() {
           加载示例源码
         </Button>
       </View>
-      {err ? <Text style={styles.err}>{err}</Text> : null}
+      {err ? <Text style={[styles.err, { color: theme.colors.error }]}>{err}</Text> : null}
       {!!jsonText && (
-        <View style={styles.resultBox}>
-          <Text selectable style={styles.resultText}>{jsonText}</Text>
+        <View style={[styles.resultBox, { backgroundColor: theme.colors.surfaceVariant }]}>
+          <Text selectable style={[styles.resultText, { color: theme.colors.onSurface }]}>{jsonText}</Text>
         </View>
       )}
     </ScrollView>
@@ -104,12 +111,10 @@ const styles = StyleSheet.create({
     borderRadius: 10,
   },
   err: {
-    color: '#d00',
     marginTop: 8,
   },
   resultBox: {
     marginTop: 12,
-    backgroundColor: '#f6f8fa',
     borderRadius: 10,
     padding: 12,
   },

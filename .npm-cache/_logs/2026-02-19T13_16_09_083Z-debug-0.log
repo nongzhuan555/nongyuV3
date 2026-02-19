@@ -1,0 +1,66 @@
+0 verbose cli E:\node\node.exe E:\node\node_modules\npm\bin\npm-cli.js
+1 info using npm@11.8.0
+2 info using node@v24.13.1
+3 silly config load:file:E:\node\node_modules\npm\npmrc
+4 silly config load:file:C:\Users\TANGLEI\Desktop\nongyu\.npmrc
+5 silly config load:file:C:\Users\TANGLEI\.npmrc
+6 silly config load:file:E:\node\node_global\etc\npmrc
+7 verbose title npm install expo-native-wechat
+8 verbose argv "install" "expo-native-wechat" "--save" "--cache" "./.npm-cache" "--no-audit"
+9 verbose logfile logs-max:10 dir:C:\Users\TANGLEI\Desktop\nongyu\.npm-cache\_logs\2026-02-19T13_16_09_083Z-
+10 verbose logfile C:\Users\TANGLEI\Desktop\nongyu\.npm-cache\_logs\2026-02-19T13_16_09_083Z-debug-0.log
+11 silly logfile done cleaning log files
+12 silly packumentCache heap:4496293888 maxSize:1124073472 maxEntrySize:562036736
+13 silly idealTree buildDeps
+14 silly fetch manifest expo-native-wechat@*
+15 silly packumentCache full:https://registry.npmjs.org/expo-native-wechat cache-miss
+16 http fetch GET 200 https://registry.npmjs.org/expo-native-wechat 5488ms (cache miss)
+17 silly packumentCache full:https://registry.npmjs.org/expo-native-wechat set size:undefined disposed:false
+18 silly fetch manifest expo@~54.0.33
+19 silly packumentCache full:https://registry.npmjs.org/expo cache-miss
+20 http fetch GET 200 https://registry.npmjs.org/expo 309ms (cache revalidated)
+21 silly packumentCache full:https://registry.npmjs.org/expo set size:3521086 disposed:false
+22 silly fetch manifest @expo/dom-webview@*
+23 silly packumentCache full:https://registry.npmjs.org/@expo%2fdom-webview cache-miss
+24 http fetch GET 200 https://registry.npmjs.org/@expo%2fdom-webview 405ms (cache revalidated)
+25 silly packumentCache full:https://registry.npmjs.org/@expo%2fdom-webview set size:316016 disposed:false
+26 silly fetch manifest react@19.1.0
+27 silly packumentCache full:https://registry.npmjs.org/react cache-miss
+28 http cache https://registry.npmjs.org/react 11ms (cache hit)
+29 silly packumentCache full:https://registry.npmjs.org/react set size:6496179 disposed:false
+30 silly fetch manifest react-native@0.81.5
+31 silly packumentCache full:https://registry.npmjs.org/react-native cache-miss
+32 http cache https://registry.npmjs.org/react-native 24ms (cache hit)
+33 silly packumentCache full:https://registry.npmjs.org/react-native set size:14832318 disposed:false
+34 silly fetch manifest @types/react@~19.1.0
+35 silly packumentCache full:https://registry.npmjs.org/@types%2freact cache-miss
+36 http cache https://registry.npmjs.org/@types%2freact 7ms (cache hit)
+37 silly packumentCache full:https://registry.npmjs.org/@types%2freact set size:2588986 disposed:false
+38 silly fetch manifest @expo/metro-runtime@*
+39 silly packumentCache full:https://registry.npmjs.org/@expo%2fmetro-runtime cache-miss
+40 http fetch GET 200 https://registry.npmjs.org/@expo%2fmetro-runtime 379ms (cache revalidated)
+41 silly packumentCache full:https://registry.npmjs.org/@expo%2fmetro-runtime set size:579489 disposed:false
+42 silly fetch manifest react-dom@*
+43 silly packumentCache full:https://registry.npmjs.org/react-dom cache-miss
+44 http fetch GET 200 https://registry.npmjs.org/react-dom 1371ms (cache updated)
+45 silly packumentCache full:https://registry.npmjs.org/react-dom set size:undefined disposed:false
+46 silly fetch manifest react@^19.2.4
+47 silly packumentCache full:https://registry.npmjs.org/react cache-miss
+48 http cache https://registry.npmjs.org/react 13ms (cache hit)
+49 silly packumentCache full:https://registry.npmjs.org/react set size:6496179 disposed:false
+50 silly fetch manifest react-native-webview@^13.15.0
+51 silly packumentCache full:https://registry.npmjs.org/react-native-webview cache-miss
+52 http fetch GET 200 https://registry.npmjs.org/react-native-webview 317ms (cache revalidated)
+53 silly packumentCache full:https://registry.npmjs.org/react-native-webview set size:1350913 disposed:false
+54 silly placeDep ROOT expo-native-wechat@0.3.1 OK for: nongyu@1.0.0 want: *
+55 silly reify moves {}
+56 http cache expo-native-wechat@https://registry.npmjs.org/expo-native-wechat/-/expo-native-wechat-0.3.1.tgz 0ms (cache hit)
+57 silly tarball no local data for expo-native-wechat@https://registry.npmjs.org/expo-native-wechat/-/expo-native-wechat-0.3.1.tgz. Extracting by manifest.
+58 http fetch GET 200 https://registry.npmjs.org/expo-native-wechat/-/expo-native-wechat-0.3.1.tgz 386ms (cache miss)
+59 silly ADD node_modules/expo-native-wechat
+60 verbose cwd C:\Users\TANGLEI\Desktop\nongyu
+61 verbose os Windows_NT 10.0.26100
+62 verbose node v24.13.1
+63 verbose npm  v11.8.0
+64 verbose exit 0
+65 info ok
