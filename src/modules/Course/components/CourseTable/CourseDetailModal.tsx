@@ -1,9 +1,11 @@
 import React, { useMemo, useEffect, useRef } from 'react';
-import { View, StyleSheet, ScrollView, TouchableOpacity, Dimensions, Animated, Easing, Pressable } from 'react-native';
+import { View, StyleSheet, ScrollView, TouchableOpacity, Dimensions, Animated, Easing, Pressable, Alert } from 'react-native';
 import { Portal, Text, Button, IconButton, useTheme, Surface } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import TodoList from '../TodoList';
 import { CourseEntry, AttendanceRecord } from './types';
+import { addEventToCalendar } from '@/utils/calendar';
+import { COURSE_TIMES } from '@/utils/courseParser';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -70,6 +72,62 @@ export default function CourseDetailModal({ visible, course, attendance, onClose
       </View>
     </View>
   );
+
+  const handleAddToCalendar = async () => {
+    if (!course) return;
+
+    try {
+      // 1. 获取课程开始和结束时间（格式 HH:mm）
+      const startT = COURSE_TIMES[course.startPeriod - 1];
+      const endT = COURSE_TIMES[course.endPeriod - 1];
+
+      if (!startT || !endT) {
+        Alert.alert('无法添加', '无法获取课程时间信息');
+        return;
+      }
+
+      // 2. 计算下一次上课的日期
+      const now = new Date();
+      const currentDay = now.getDay() === 0 ? 7 : now.getDay(); // 1-7 (周一到周日)
+      const targetDay = course.day; // 1-7
+
+      // 计算本周该课程的日期
+      // 这里的 diff 是相差的天数
+      // 如果今天是周三(3)，课程是周一(1)，diff = -2，也就是两天前
+      // 如果今天是周三(3)，课程是周五(5)，diff = 2，也就是两天后
+      const diff = targetDay - currentDay;
+      
+      const targetDate = new Date(now);
+      targetDate.setDate(now.getDate() + diff);
+
+      // 解析具体的小时和分钟
+      const [sh, sm] = startT.start.split(':').map(Number);
+      const [eh, em] = endT.end.split(':').map(Number);
+
+      // 设置具体时间
+      targetDate.setHours(sh, sm, 0, 0);
+
+      // 如果计算出的时间早于当前时间，说明这节课本周已经结束了，应该取下周的时间
+      if (targetDate.getTime() < now.getTime()) {
+        targetDate.setDate(targetDate.getDate() + 7);
+      }
+
+      const endDate = new Date(targetDate);
+      endDate.setHours(eh, em, 0, 0);
+
+      // 3. 调用工具函数添加到日历
+      await addEventToCalendar(
+        course.name,
+        targetDate,
+        endDate,
+        course.room || '未知教室',
+        `教师: ${course.teacher || '未知'}\n节次: ${course.startPeriod}-${course.endPeriod}`
+      );
+    } catch (error) {
+      console.error('Failed to add calendar event:', error);
+      Alert.alert('添加失败', '发生未知错误');
+    }
+  };
 
   return (
     <Portal>
@@ -145,6 +203,16 @@ export default function CourseDetailModal({ visible, course, attendance, onClose
           )}
 
           {/* 操作区域 */}
+          <Button 
+            mode="outlined" 
+            textColor={theme.colors.primary} 
+            style={[styles.deleteBtn, { borderColor: theme.colors.primary, marginBottom: 12 }]} 
+            icon="calendar-clock"
+            onPress={handleAddToCalendar}
+          >
+            添加下一次上课提醒
+          </Button>
+
           <Button 
             mode="outlined" 
             textColor={theme.colors.error} 

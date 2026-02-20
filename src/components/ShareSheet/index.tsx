@@ -150,13 +150,19 @@ const ShareSheet: React.FC<ShareSheetProps> = ({ visible, onDismiss, screenshotU
 
         try {
           if (platform === 'wechat') {
-            await WeChat.shareText({
-              text: '快来加入农屿，体验更便捷的校园生活！https://nongyu.app',
+            await WeChat.shareWebpage({
+              title: '农屿 - 川农学子的贴心助手',
+              description: '课表成绩一键查，考试安排早知道。让校园生活更简单，点击立即体验！',
+              thumbImage: 'https://nongyu.app/logo.png',
+              webpageUrl: 'https://nongyu.app',
               scene: 0, // 0: Session, 1: Timeline, 2: Favorite
             });
           } else {
-            await WeChat.shareText({
-              text: '快来加入农屿，体验更便捷的校园生活！https://nongyu.app',
+            await WeChat.shareWebpage({
+              title: '农屿 - 川农学子的贴心助手',
+              description: '课表成绩一键查，考试安排早知道。让校园生活更简单，点击立即体验！',
+              thumbImage: 'https://nongyu.app/logo.png',
+              webpageUrl: 'https://nongyu.app',
               scene: 1, // Timeline
             });
           }
@@ -166,7 +172,7 @@ const ShareSheet: React.FC<ShareSheetProps> = ({ visible, onDismiss, screenshotU
       } else if (platform === 'system') {
         try {
           await Share.share({
-            message: '快来加入农屿，体验更便捷的校园生活！https://nongyu.app',
+            message: '农屿 - 川农学子的贴心助手\n课表成绩一键查，考试安排早知道。让校园生活更简单，点击立即体验！\nhttps://nongyu.app',
             title: '分享农屿',
           });
         } catch (error: any) {

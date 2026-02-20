@@ -4,6 +4,7 @@ import { TextInput, Button, Text, useTheme, Surface, IconButton } from 'react-na
 import { useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import api, { setSecondClassToken, clearSecondClassToken, setSecondClassCredentials, debugStorage } from '../api';
 
 export default function SecondLogin() {
@@ -80,86 +81,103 @@ export default function SecondLogin() {
       style={{flex: 1, backgroundColor: theme.colors.background}}
     >
       <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-        <View style={[styles.container, { paddingTop: insets.top }]}>
-          <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-            <View style={styles.header}>
-              <View style={styles.iconContainer}>
-                <MaterialCommunityIcons name="trophy-outline" size={48} color={theme.colors.primary} />
+        <View style={styles.container}>
+          <LinearGradient
+            colors={[theme.colors.primaryContainer, theme.colors.background]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 0, y: 1 }}
+            locations={[0, 0.4]}
+            style={StyleSheet.absoluteFill}
+          />
+          <View style={{ flex: 1, paddingTop: insets.top }}>
+            <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+              <View style={styles.header}>
+                <View style={styles.headerTopRow}>
+                   <IconButton 
+                     icon="close" 
+                     size={24} 
+                     onPress={() => navigation.canGoBack() ? navigation.goBack() : navigation.navigate('RootTabs')} 
+                     style={styles.closeButton}
+                   />
+                </View>
+                <View style={styles.iconContainer}>
+                  <MaterialCommunityIcons name="trophy-outline" size={48} color={theme.colors.primary} />
+                </View>
+                <Text variant="headlineMedium" style={[styles.title, { color: theme.colors.onSurface }]}>
+                  二课系统登录
+                </Text>
+                <Text variant="bodyLarge" style={[styles.subtitle, { color: theme.colors.secondary }]}>
+                  开启你的第二课堂之旅
+                </Text>
               </View>
-              <Text variant="headlineMedium" style={[styles.title, { color: theme.colors.onSurface }]}>
-                二课系统登录
-              </Text>
-              <Text variant="bodyLarge" style={[styles.subtitle, { color: theme.colors.secondary }]}>
-                开启你的第二课堂之旅
-              </Text>
-            </View>
-            
-            <View style={styles.form}>
-              <TextInput
-                label="学号"
-                value={username}
-                onChangeText={setUsername}
-                mode="outlined"
-                style={styles.input}
-                autoCapitalize="none"
-                left={<TextInput.Icon icon="account-outline" color={theme.colors.primary} />}
-                theme={{ roundness: 12 }}
-              />
-              <TextInput
-                label="密码"
-                value={password}
-                onChangeText={setPassword}
-                mode="outlined"
-                secureTextEntry={!showPassword}
-                style={styles.input}
-                left={<TextInput.Icon icon="lock-outline" color={theme.colors.primary} />}
-                right={
-                  <TextInput.Icon 
-                    icon={showPassword ? "eye-off" : "eye"} 
-                    onPress={() => setShowPassword(!showPassword)}
-                  />
-                }
-                theme={{ roundness: 12 }}
-              />
               
-              <Button 
-                mode="contained" 
-                onPress={handleLogin} 
-                loading={loading} 
-                disabled={loading}
-                style={styles.button}
-                contentStyle={{ height: 50 }}
-                labelStyle={{ fontSize: 16, fontWeight: 'bold' }}
-              >
-                {loading ? '登录中...' : '立即登录'}
-              </Button>
-            </View>
+              <View style={styles.form}>
+                <TextInput
+                  label="学号"
+                  value={username}
+                  onChangeText={setUsername}
+                  mode="outlined"
+                  style={styles.input}
+                  autoCapitalize="none"
+                  left={<TextInput.Icon icon="account-outline" color={theme.colors.primary} />}
+                  theme={{ roundness: 12 }}
+                />
+                <TextInput
+                  label="密码"
+                  value={password}
+                  onChangeText={setPassword}
+                  mode="outlined"
+                  secureTextEntry={!showPassword}
+                  style={styles.input}
+                  left={<TextInput.Icon icon="lock-outline" color={theme.colors.primary} />}
+                  right={
+                    <TextInput.Icon 
+                      icon={showPassword ? "eye-off" : "eye"} 
+                      onPress={() => setShowPassword(!showPassword)}
+                    />
+                  }
+                  theme={{ roundness: 12 }}
+                />
+                
+                <Button 
+                  mode="contained" 
+                  onPress={handleLogin} 
+                  loading={loading} 
+                  disabled={loading}
+                  style={styles.button}
+                  contentStyle={{ height: 50 }}
+                  labelStyle={{ fontSize: 16, fontWeight: 'bold' }}
+                >
+                  {loading ? '登录中...' : '立即登录'}
+                </Button>
+              </View>
 
-            <Surface style={[styles.tipsContainer, { backgroundColor: theme.colors.surfaceVariant }]} elevation={0}>
-              <View style={styles.tipsHeader}>
-                <MaterialCommunityIcons name="information-outline" size={20} color={theme.colors.primary} />
-                <Text variant="titleSmall" style={[styles.tipsTitle, { color: theme.colors.primary }]}>温馨提示</Text>
+              <View style={styles.tipsContainer}>
+                <View style={styles.tipsHeader}>
+                  <MaterialCommunityIcons name="information-outline" size={16} color={theme.colors.onSurface} style={{ opacity: 0.8 }} />
+                  <Text variant="labelMedium" style={[styles.tipsTitle, { color: theme.colors.onSurface, opacity: 0.9 }]}>温馨提示</Text>
+                </View>
+                <View style={styles.tipItem}>
+                  <Text style={[styles.bullet, { color: theme.colors.onSurfaceVariant, opacity: 0.8 }]}>•</Text>
+                  <Text variant="bodySmall" style={[styles.tipText, { color: theme.colors.onSurfaceVariant, opacity: 0.8 }]}>
+                    农屿和i川农是两套独立的系统
+                  </Text>
+                </View>
+                <View style={styles.tipItem}>
+                  <Text style={[styles.bullet, { color: theme.colors.onSurfaceVariant, opacity: 0.8 }]}>•</Text>
+                  <Text variant="bodySmall" style={[styles.tipText, { color: theme.colors.onSurfaceVariant, opacity: 0.8 }]}>
+                    想在农屿上集成i川农的二课功能需要登录
+                  </Text>
+                </View>
+                <View style={styles.tipItem}>
+                  <Text style={[styles.bullet, { color: theme.colors.onSurfaceVariant, opacity: 0.8 }]}>•</Text>
+                  <Text variant="bodySmall" style={[styles.tipText, { color: theme.colors.onSurfaceVariant, opacity: 0.8 }]}>
+                    后续使用中若登录过期再重新登陆即可
+                  </Text>
+                </View>
               </View>
-              <View style={styles.tipItem}>
-                <Text style={[styles.bullet, { color: theme.colors.onSurfaceVariant }]}>•</Text>
-                <Text variant="bodyMedium" style={[styles.tipText, { color: theme.colors.onSurfaceVariant }]}>
-                  农屿和i川农是两套独立的系统
-                </Text>
-              </View>
-              <View style={styles.tipItem}>
-                <Text style={[styles.bullet, { color: theme.colors.onSurfaceVariant }]}>•</Text>
-                <Text variant="bodyMedium" style={[styles.tipText, { color: theme.colors.onSurfaceVariant }]}>
-                  想在农屿上集成i川农的二课功能需要登录
-                </Text>
-              </View>
-              <View style={styles.tipItem}>
-                <Text style={[styles.bullet, { color: theme.colors.onSurfaceVariant }]}>•</Text>
-                <Text variant="bodyMedium" style={[styles.tipText, { color: theme.colors.onSurfaceVariant }]}>
-                  后续使用中若登录过期再重新登陆即可
-                </Text>
-              </View>
-            </Surface>
-          </ScrollView>
+            </ScrollView>
+          </View>
         </View>
       </TouchableWithoutFeedback>
     </KeyboardAvoidingView>
@@ -178,6 +196,14 @@ const styles = StyleSheet.create({
   header: {
     alignItems: 'center',
     marginBottom: 48,
+  },
+  headerTopRow: {
+    width: '100%',
+    alignItems: 'flex-start',
+    marginBottom: 10,
+  },
+  closeButton: {
+    marginLeft: -10,
   },
   iconContainer: {
     marginBottom: 16,

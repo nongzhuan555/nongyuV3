@@ -5,6 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { getPersonInfoFromJiaowu, loginJiaoWu } from '@/jiaowu/login/login';
 import { post, setHttpConfig, toHttpError } from '@/shared/http';
 import { profileStore } from '@/stores/profile';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 type Props = {
@@ -163,6 +164,7 @@ export default function JiaowuLoginProbe({ onSuccess, suppressSuccessNavigate }:
     setError(null);
     setOk(null);
     setStatusText('正在验证教务账号...');
+    let isNongyuLogin = false;
     try {
       const loginResp = await loginJiaoWu(user, pwd);
       const passed = !!loginResp?.passed;
@@ -183,6 +185,7 @@ export default function JiaowuLoginProbe({ onSuccess, suppressSuccessNavigate }:
       }
       setStatusText('正在登录农屿...');
       addLog('开始登录农屿后台', payload);
+      isNongyuLogin = true;
       const resp = await post('/login', payload);
       const data = (resp?.data ?? {}) as Record<string, unknown>;
       const inner = (data.data ?? {}) as Record<string, unknown>;
@@ -226,6 +229,8 @@ export default function JiaowuLoginProbe({ onSuccess, suppressSuccessNavigate }:
       addLog('请求错误', { message: httpErr.message, status: httpErr.status, data: httpErr.data });
       if (httpErr.status === 409) {
         showTopMessage('学号已存在，请直接登录或联系管理员');
+      } else if (isNongyuLogin) {
+        showTopMessage('初次登录可能不稳定，请再次尝试~');
       } else if (httpErr.status === 500) {
         showTopMessage('服务器异常，请稍后重试');
       } else {
@@ -271,15 +276,11 @@ export default function JiaowuLoginProbe({ onSuccess, suppressSuccessNavigate }:
         style={[
           styles.wrap,
           {
-            backgroundColor: theme.colors.surface,
-            borderColor: theme.colors.outline,
-            shadowColor: theme.colors.shadow,
             opacity: fade,
             transform: [{ translateY: offsetY }],
           },
         ]}
       >
-        <Text style={[styles.title, { color: theme.colors.onSurface }]}>使用川农教务系统登录</Text>
         <TextInput
           label="学号"
           mode="outlined"
@@ -293,6 +294,7 @@ export default function JiaowuLoginProbe({ onSuccess, suppressSuccessNavigate }:
           autoCapitalize="none"
           error={!!idError}
           outlineStyle={styles.outline}
+          theme={{ roundness: 16 }}
         />
         {!!idError ? <Text style={[styles.errTip, { color: theme.colors.error }]}>{idError}</Text> : null}
         <TextInput
@@ -310,18 +312,32 @@ export default function JiaowuLoginProbe({ onSuccess, suppressSuccessNavigate }:
             />
           }
           outlineStyle={styles.outline}
+          theme={{ roundness: 16 }}
         />
-        <Button mode="contained" onPress={onSubmit} disabled={!canSubmit} style={styles.btn}>
+        <Button 
+          mode="contained" 
+          onPress={onSubmit} 
+          disabled={!canSubmit} 
+          style={styles.btn}
+          contentStyle={styles.btnContent}
+          labelStyle={styles.btnLabel}
+        >
           进入农屿
         </Button>
 
         <View style={styles.result}>
           {loading ? <ActivityIndicator /> : null}
-          {!!statusText ? <Text style={styles.text}>{statusText}</Text> : null}
+          {!!statusText ? <Text style={[styles.text, { color: theme.colors.onSurfaceVariant }]}>{statusText}</Text> : null}
           {!loading && error ? <Text style={[styles.err, { color: theme.colors.error }]}>{error}</Text> : null}
-          {/* 移除状态码文案显示 */}
-          {/* 已按要求隐藏响应报文 */}
         </View>
+
+        <View style={styles.tipsContainer}>
+           <MaterialCommunityIcons name="shield-check-outline" size={18} color={theme.colors.onSurfaceVariant} style={[styles.tipsIcon, { opacity: 0.5 }]} />
+           <Text style={[styles.tipsText, { color: theme.colors.onSurfaceVariant }]}>
+             农屿承诺不会在云端存储您的密码信息，但为了功能需要，会将密码等数据存储在客户端本地
+           </Text>
+        </View>
+
         {ok ? (
           <Portal>
             <View style={[styles['login__msgWrap'], { top: (insets?.top ?? 0) + 120 }]}>
@@ -352,16 +368,7 @@ export default function JiaowuLoginProbe({ onSuccess, suppressSuccessNavigate }:
 
 const styles = StyleSheet.create({
   wrap: {
-    width: '92%',
-    alignSelf: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    borderRadius: 16,
-    borderWidth: StyleSheet.hairlineWidth,
-    shadowOpacity: 0.06,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 8 },
-    elevation: 6,
+    width: '100%',
   },
   topMsg: {
     position: 'absolute',
@@ -379,34 +386,43 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 18,
   },
-  title: {
-    fontSize: 18,
-    marginBottom: 10,
-    fontWeight: '600',
-  },
   input: {
-    marginBottom: 10,
+    marginBottom: 16,
+    backgroundColor: 'transparent',
   },
   errTip: {
     fontSize: 12,
-    marginTop: -6,
-    marginBottom: 6,
+    marginTop: -12,
+    marginBottom: 12,
+    marginLeft: 4,
   },
   btn: {
-    marginTop: 2,
-    borderRadius: 10,
+    marginTop: 8,
+    borderRadius: 30,
+  },
+  btnContent: {
+    height: 52,
+  },
+  btnLabel: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    letterSpacing: 1,
   },
   result: {
-    marginTop: 10,
+    marginTop: 16,
     minHeight: 20,
+    alignItems: 'center',
   },
   text: {
-    fontSize: 12,
+    fontSize: 13,
+    marginTop: 8,
   },
   outline: {
-    borderRadius: 12,
+    borderRadius: 16,
   },
   err: {
+    fontSize: 13,
+    marginTop: 8,
   },
   login__msgWrap: {
     position: 'absolute',
@@ -415,5 +431,21 @@ const styles = StyleSheet.create({
   },
   login__msgSuccess: {
     borderRadius: 14,
+  },
+  tipsContainer: {
+    flexDirection: 'row',
+    marginTop: 32,
+    paddingHorizontal: 8,
+    alignItems: 'flex-start',
+  },
+  tipsIcon: {
+    marginRight: 8,
+    marginTop: 2,
+  },
+  tipsText: {
+    flex: 1,
+    fontSize: 12,
+    lineHeight: 18,
+    opacity: 0.5,
   },
 });

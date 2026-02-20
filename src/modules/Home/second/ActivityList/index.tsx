@@ -1,8 +1,10 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { View, FlatList, StyleSheet, RefreshControl, ActivityIndicator, TouchableOpacity, Image, ScrollView } from 'react-native';
 import { Text, Searchbar, Chip, useTheme, Appbar, SegmentedButtons, Portal, Modal, List, Button, Divider, Snackbar, Icon } from 'react-native-paper';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { observer } from 'mobx-react-lite';
+import { profileStore } from '@/stores/profile';
 import api from '../api';
 
 type Activity = {
@@ -48,11 +50,11 @@ const ActivityItem = React.memo(({ item, onPress }: { item: Activity; onPress: (
   );
 });
 
-export default function SecondActivityList() {
+function SecondActivityList() {
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
   const theme = useTheme();
-  
+
   const [activities, setActivities] = useState<Activity[]>([]);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -352,6 +354,8 @@ export default function SecondActivityList() {
     </View>
   );
 }
+
+export default observer(SecondActivityList);
 
 const styles = StyleSheet.create({
   container: {

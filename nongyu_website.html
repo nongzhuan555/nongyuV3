@@ -1,0 +1,761 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>农屿 NongYu - 专为川农学子打造的校园助手</title>
+    <style>
+        :root {
+            --primary: #07C160;
+            --primary-dark: #059b4c;
+            --primary-light: #E7FAF0;
+            --bg-body: #FAFAFA;
+            --bg-card: #FFFFFF;
+            --text-main: #1D1D1F;
+            --text-secondary: #86868B;
+            --border: #E5E5E5;
+            --radius-lg: 24px;
+            --radius-md: 16px;
+            --shadow: 0 4px 20px rgba(0,0,0,0.05);
+            --font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "PingFang SC", "Microsoft YaHei", sans-serif;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: var(--font-family);
+            background-color: var(--bg-body);
+            color: var(--text-main);
+            line-height: 1.6;
+            overflow-x: hidden;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        /* --- Components --- */
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 24px;
+        }
+
+        .btn {
+            display: inline-block;
+            padding: 12px 32px;
+            background-color: var(--primary);
+            color: white;
+            border-radius: 30px;
+            text-decoration: none;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            border: none;
+            cursor: pointer;
+            font-size: 16px;
+            box-shadow: 0 4px 12px rgba(7, 193, 96, 0.3);
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            background-color: var(--primary-dark);
+            box-shadow: 0 6px 16px rgba(7, 193, 96, 0.4);
+        }
+
+        .btn-outline {
+            background-color: transparent;
+            border: 2px solid var(--primary);
+            color: var(--primary);
+            box-shadow: none;
+        }
+
+        .btn-outline:hover {
+            background-color: var(--primary-light);
+            color: var(--primary-dark);
+            box-shadow: none;
+        }
+
+        h1, h2, h3, h4 {
+            font-weight: 700;
+            line-height: 1.2;
+        }
+
+        h2 {
+            font-size: 40px;
+            margin-bottom: 24px;
+            text-align: center;
+            letter-spacing: -0.5px;
+        }
+
+        p.subtitle {
+            text-align: center;
+            color: var(--text-secondary);
+            font-size: 18px;
+            max-width: 600px;
+            margin: 0 auto 60px;
+        }
+
+        /* --- Header --- */
+        header {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            z-index: 1000;
+            background: rgba(255, 255, 255, 0.8);
+            backdrop-filter: blur(20px);
+            border-bottom: 1px solid rgba(0,0,0,0.05);
+            transition: all 0.3s ease;
+        }
+
+        nav {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            height: 70px;
+        }
+
+        .logo {
+            font-size: 24px;
+            font-weight: 800;
+            color: var(--text-main);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            text-decoration: none;
+        }
+
+        .logo span {
+            color: var(--primary);
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 32px;
+        }
+
+        .nav-links a {
+            text-decoration: none;
+            color: var(--text-secondary);
+            font-weight: 500;
+            font-size: 15px;
+            transition: color 0.2s;
+        }
+
+        .nav-links a:hover {
+            color: var(--primary);
+        }
+
+        .menu-toggle {
+            display: none;
+            font-size: 24px;
+            cursor: pointer;
+        }
+
+        /* --- Hero Section --- */
+        .hero {
+            padding: 160px 0 100px;
+            text-align: center;
+            background: radial-gradient(circle at 50% 0%, #f0fff4 0%, #fafafa 70%);
+        }
+
+        .hero h1 {
+            font-size: 64px;
+            margin-bottom: 24px;
+            background: linear-gradient(135deg, #1D1D1F 0%, #4a4a4a 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            letter-spacing: -1px;
+        }
+
+        .hero p {
+            font-size: 24px;
+            color: var(--text-secondary);
+            margin-bottom: 40px;
+            max-width: 700px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        .hero-image {
+            margin-top: 60px;
+            width: 100%;
+            max-width: 1000px;
+            height: 500px;
+            background: #fff;
+            border-radius: var(--radius-lg);
+            box-shadow: 0 20px 60px rgba(0,0,0,0.08);
+            margin-left: auto;
+            margin-right: auto;
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 1px solid rgba(0,0,0,0.05);
+            position: relative;
+        }
+        
+        .hero-image::after {
+            content: "App Preview UI Placeholder";
+            color: #ccc;
+            font-size: 24px;
+            font-weight: 600;
+        }
+
+        /* --- Sections --- */
+        section {
+            padding: 100px 0;
+        }
+
+        .bg-white {
+            background-color: var(--bg-card);
+        }
+
+        /* Philosophy & Story */
+        .grid-2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 60px;
+            align-items: center;
+        }
+
+        .story-content h3 {
+            font-size: 32px;
+            margin-bottom: 20px;
+        }
+
+        .story-content p {
+            color: var(--text-secondary);
+            font-size: 17px;
+            margin-bottom: 20px;
+        }
+
+        .feature-card {
+            background: var(--bg-card);
+            padding: 40px;
+            border-radius: var(--radius-lg);
+            box-shadow: var(--shadow);
+            transition: transform 0.3s ease;
+            border: 1px solid rgba(0,0,0,0.03);
+        }
+
+        .feature-card:hover {
+            transform: translateY(-10px);
+        }
+
+        .feature-icon {
+            width: 60px;
+            height: 60px;
+            background: var(--primary-light);
+            border-radius: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 24px;
+            font-size: 24px;
+            color: var(--primary);
+        }
+
+        .grid-3 {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 30px;
+        }
+
+        /* Timeline */
+        .timeline {
+            position: relative;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        .timeline::after {
+            content: '';
+            position: absolute;
+            width: 2px;
+            background-color: #eee;
+            top: 0;
+            bottom: 0;
+            left: 50%;
+            margin-left: -1px;
+        }
+
+        .timeline-item {
+            padding: 10px 40px;
+            position: relative;
+            background-color: inherit;
+            width: 50%;
+        }
+
+        .timeline-item::after {
+            content: '';
+            position: absolute;
+            width: 16px;
+            height: 16px;
+            right: -8px;
+            background-color: var(--bg-card);
+            border: 4px solid var(--primary);
+            top: 15px;
+            border-radius: 50%;
+            z-index: 1;
+        }
+
+        .left {
+            left: 0;
+            text-align: right;
+        }
+
+        .right {
+            left: 50%;
+        }
+
+        .right::after {
+            left: -8px;
+        }
+
+        .timeline-content {
+            padding: 20px 30px;
+            background-color: white;
+            position: relative;
+            border-radius: var(--radius-md);
+            box-shadow: var(--shadow);
+        }
+
+        /* Team */
+        .team-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 40px;
+            margin-top: 60px;
+        }
+
+        .team-member {
+            text-align: center;
+        }
+
+        .avatar {
+            width: 120px;
+            height: 120px;
+            border-radius: 50%;
+            background-color: #ddd;
+            margin: 0 auto 20px;
+            overflow: hidden;
+            border: 4px solid white;
+            box-shadow: var(--shadow);
+        }
+        
+        .avatar img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        /* Guide */
+        .guide-step {
+            display: flex;
+            gap: 30px;
+            margin-bottom: 40px;
+            align-items: flex-start;
+        }
+
+        .step-number {
+            font-size: 40px;
+            font-weight: 800;
+            color: var(--primary);
+            opacity: 0.2;
+            line-height: 1;
+        }
+
+        /* Footer */
+        footer {
+            background-color: #f5f5f7;
+            padding: 80px 0 40px;
+            margin-top: 100px;
+            border-top: 1px solid #e5e5e5;
+        }
+
+        .footer-content {
+            display: grid;
+            grid-template-columns: 2fr 1fr 1fr 1fr;
+            gap: 40px;
+            margin-bottom: 60px;
+        }
+
+        .footer-brand p {
+            color: var(--text-secondary);
+            margin-top: 16px;
+            max-width: 300px;
+        }
+
+        .footer-col h4 {
+            margin-bottom: 20px;
+            font-size: 16px;
+        }
+
+        .footer-col ul {
+            list-style: none;
+        }
+
+        .footer-col ul li {
+            margin-bottom: 12px;
+        }
+
+        .footer-col ul li a {
+            color: var(--text-secondary);
+            text-decoration: none;
+            font-size: 14px;
+        }
+
+        .footer-col ul li a:hover {
+            color: var(--primary);
+        }
+
+        .copyright {
+            text-align: center;
+            color: #999;
+            font-size: 13px;
+            padding-top: 40px;
+            border-top: 1px solid #e5e5e5;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .hero h1 { font-size: 40px; }
+            .grid-2, .grid-3 { grid-template-columns: 1fr; }
+            .timeline::after { left: 31px; }
+            .timeline-item { width: 100%; padding-left: 70px; padding-right: 25px; }
+            .timeline-item::after { left: 23px; }
+            .left { text-align: left; }
+            .nav-links { display: none; }
+            .menu-toggle { display: block; }
+            .footer-content { grid-template-columns: 1fr; gap: 40px; }
+        }
+
+        /* Animations */
+        .fade-in {
+            opacity: 0;
+            transform: translateY(30px);
+            transition: all 0.8s ease;
+        }
+        
+        .fade-in.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Header -->
+    <header id="header">
+        <div class="container">
+            <nav>
+                <a href="#" class="logo">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M12 2L2 7L12 12L22 7L12 2Z" stroke="#07C160" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        <path d="M2 17L12 22L22 17" stroke="#07C160" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        <path d="M2 12L12 17L22 12" stroke="#07C160" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                    农屿 <span>NongYu</span>
+                </a>
+                <div class="nav-links">
+                    <a href="#about">关于农屿</a>
+                    <a href="#features">核心功能</a>
+                    <a href="#timeline">历程</a>
+                    <a href="#guide">使用指南</a>
+                    <a href="#team">团队</a>
+                </div>
+                <div class="menu-toggle">☰</div>
+            </nav>
+        </div>
+    </header>
+
+    <!-- Hero -->
+    <section class="hero">
+        <div class="container">
+            <h1 class="fade-in">更懂川农学子的<br>贴心校园助手</h1>
+            <p class="fade-in">课表查询 · 成绩管理 · 考试提醒 · 校园资讯<br>让大学生活化繁为简，尽在指尖掌控。</p>
+            <div class="fade-in" style="display: flex; gap: 16px; justify-content: center;">
+                <a href="#" class="btn">立即下载 App</a>
+                <a href="#features" class="btn btn-outline">了解更多</a>
+            </div>
+            <div class="hero-image fade-in">
+                <!-- Placeholder for App Screenshot -->
+                <div style="text-align: center;">
+                    <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="#ddd" stroke-width="1">
+                        <rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect>
+                        <line x1="12" y1="18" x2="12.01" y2="18"></line>
+                    </svg>
+                    <p style="margin-top: 10px; font-size: 14px; color: #999;">App 界面预览</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Philosophy & Story -->
+    <section id="about" class="bg-white">
+        <div class="container">
+            <div class="grid-2">
+                <div class="story-content fade-in">
+                    <h2>农屿的诞生</h2>
+                    <p>“农屿”取自“川农”与“岛屿”。我们希望在浩瀚的信息海洋中，为每一位川农学子构建一座温暖、便捷、高效的数字化岛屿。</p>
+                    <p>故事始于2023年的一个午后，面对繁琐的教务系统和分散的校园信息，几位热衷技术的川农学子萌生了一个想法：为什么不做一个真正好用、好看、好玩的校园App？</p>
+                    <p>于是，从最初的一行代码，到如今服务数万师生的平台，农屿始终坚持“以学生为中心”的设计理念，用技术温暖校园生活。</p>
+                </div>
+                <div class="fade-in" style="background: #f5f5f7; height: 400px; border-radius: 24px; display: flex; align-items: center; justify-content: center;">
+                    <span style="color: #ccc; font-weight: 600;">品牌故事插图 / 校园风景</span>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Features -->
+    <section id="features">
+        <div class="container">
+            <h2>核心功能</h2>
+            <p class="subtitle">一站式解决校园生活痛点，让效率触手可及</p>
+            <div class="grid-3">
+                <div class="feature-card fade-in">
+                    <div class="feature-icon">📅</div>
+                    <h3>智能课表</h3>
+                    <p>自动同步教务系统课表，支持桌面小组件，上课提醒，不再担心错过任何一节精彩课程。</p>
+                </div>
+                <div class="feature-card fade-in">
+                    <div class="feature-icon">📊</div>
+                    <h3>成绩查询</h3>
+                    <p>实时获取最新成绩，支持加权平均分计算，绩点排名一目了然，助你学业规划更清晰。</p>
+                </div>
+                <div class="feature-card fade-in">
+                    <div class="feature-icon">📝</div>
+                    <h3>考试安排</h3>
+                    <p>考场、座号、时间精准推送，考前温馨提醒，从容应对每一场挑战。</p>
+                </div>
+                <div class="feature-card fade-in">
+                    <div class="feature-icon">🚌</div>
+                    <h3>校园生活</h3>
+                    <p>校车时刻、空教室查询、图书馆选座... 校园生活所需的工具，这里应有尽有。</p>
+                </div>
+                <div class="feature-card fade-in">
+                    <div class="feature-icon">💬</div>
+                    <h3>校友社区</h3>
+                    <p>匿名树洞、失物招领、二手交易，连接每一位川农人，让互助与交流更简单。</p>
+                </div>
+                <div class="feature-card fade-in">
+                    <div class="feature-icon">🎨</div>
+                    <h3>个性化定制</h3>
+                    <p>支持深色模式、自定义主题色、桌面小组件风格切换，打造专属于你的农屿。</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Timeline -->
+    <section id="timeline" class="bg-white">
+        <div class="container">
+            <h2>农屿历程</h2>
+            <p class="subtitle">每一步，都离不开你的支持</p>
+            <div class="timeline">
+                <div class="timeline-item left fade-in">
+                    <div class="timeline-content">
+                        <h4>2023.09</h4>
+                        <p>农屿项目正式立项，核心团队组建完成，确立“服务川农学子”的初心。</p>
+                    </div>
+                </div>
+                <div class="timeline-item right fade-in">
+                    <div class="timeline-content">
+                        <h4>2023.12</h4>
+                        <p>农屿 v1.0 内测版发布，首批邀请100位同学参与体验，收获宝贵反馈。</p>
+                    </div>
+                </div>
+                <div class="timeline-item left fade-in">
+                    <div class="timeline-content">
+                        <h4>2024.03</h4>
+                        <p>农屿 v2.0 正式上线，接入教务系统核心功能，首周用户突破 5,000 人。</p>
+                    </div>
+                </div>
+                <div class="timeline-item right fade-in">
+                    <div class="timeline-content">
+                        <h4>2024.09</h4>
+                        <p>全面升级 UI 设计，推出 iOS 与 Android 双端原生体验，日活用户创新高。</p>
+                    </div>
+                </div>
+                <div class="timeline-item left fade-in">
+                    <div class="timeline-content">
+                        <h4>2025...</h4>
+                        <p>持续迭代，引入 AI 助手与更多生活服务，探索智慧校园新可能。</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Usage Guide -->
+    <section id="guide">
+        <div class="container">
+            <h2>使用指南</h2>
+            <p class="subtitle">三步开启你的农屿之旅</p>
+            <div class="grid-2">
+                <div>
+                    <div class="guide-step fade-in">
+                        <div class="step-number">01</div>
+                        <div>
+                            <h3>下载安装</h3>
+                            <p>访问官网或应用商店搜索“农屿”，下载并安装最新版 App。</p>
+                        </div>
+                    </div>
+                    <div class="guide-step fade-in">
+                        <div class="step-number">02</div>
+                        <div>
+                            <h3>身份认证</h3>
+                            <p>使用教务系统账号密码登录，我们将自动同步您的个人信息与课程数据。</p>
+                        </div>
+                    </div>
+                    <div class="guide-step fade-in">
+                        <div class="step-number">03</div>
+                        <div>
+                            <h3>开启体验</h3>
+                            <p>配置桌面小组件，设置课程提醒，开始享受便捷的校园数字生活。</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="fade-in" style="background: #fff; border: 1px solid #eee; border-radius: 24px; padding: 40px; text-align: center;">
+                    <div style="width: 200px; height: 200px; background: #f0f0f0; margin: 0 auto 20px; border-radius: 12px;"></div>
+                    <p style="font-weight: 600;">扫码直接下载</p>
+                    <p style="font-size: 14px; color: #999;">支持 iOS / Android</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Team -->
+    <section id="team" class="bg-white">
+        <div class="container">
+            <h2>遇见团队</h2>
+            <p class="subtitle">一群热爱技术、热爱生活的创造者</p>
+            <div class="team-grid">
+                <div class="team-member fade-in">
+                    <div class="avatar"></div>
+                    <h3>TANGLEI</h3>
+                    <p style="color: var(--primary);">创始人 & 全栈开发</p>
+                    <p style="font-size: 14px; color: #666; margin-top: 8px;">"代码改变世界，哪怕只是一点点。"</p>
+                </div>
+                <div class="team-member fade-in">
+                    <div class="avatar"></div>
+                    <h3>Design Lead</h3>
+                    <p style="color: var(--primary);">UI/UX 设计</p>
+                    <p style="font-size: 14px; color: #666; margin-top: 8px;">"追求极致的视觉与交互体验。"</p>
+                </div>
+                <div class="team-member fade-in">
+                    <div class="avatar"></div>
+                    <h3>Product Ops</h3>
+                    <p style="color: var(--primary);">产品运营</p>
+                    <p style="font-size: 14px; color: #666; margin-top: 8px;">"倾听每一位用户的声音。"</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer>
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-brand">
+                    <a href="#" class="logo">农屿 <span>NongYu</span></a>
+                    <p>致力于打造最懂川农学子的智慧校园生态。让科技更有温度，让校园生活更美好。</p>
+                </div>
+                <div class="footer-col">
+                    <h4>产品</h4>
+                    <ul>
+                        <li><a href="#">下载 App</a></li>
+                        <li><a href="#">更新日志</a></li>
+                        <li><a href="#">功能介绍</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col">
+                    <h4>支持</h4>
+                    <ul>
+                        <li><a href="#">使用帮助</a></li>
+                        <li><a href="#">反馈建议</a></li>
+                        <li><a href="#">联系我们</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col">
+                    <h4>关于</h4>
+                    <ul>
+                        <li><a href="#">团队故事</a></li>
+                        <li><a href="#">加入我们</a></li>
+                        <li><a href="#">隐私协议</a></li>
+                    </ul>
+                </div>
+            </div>
+            <div class="copyright">
+                &copy; 2023-2026 NongYu Team. All rights reserved. Made with ❤️ in SICAU.
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        // Smooth Scrolling
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function (e) {
+                e.preventDefault();
+                document.querySelector(this.getAttribute('href')).scrollIntoView({
+                    behavior: 'smooth'
+                });
+            });
+        });
+
+        // Header Scroll Effect
+        const header = document.getElementById('header');
+        window.addEventListener('scroll', () => {
+            if (window.scrollY > 50) {
+                header.style.background = 'rgba(255, 255, 255, 0.95)';
+                header.style.boxShadow = '0 4px 20px rgba(0,0,0,0.05)';
+            } else {
+                header.style.background = 'rgba(255, 255, 255, 0.8)';
+                header.style.boxShadow = 'none';
+            }
+        });
+
+        // Fade In Animation on Scroll
+        const observerOptions = {
+            threshold: 0.1,
+            rootMargin: "0px 0px -50px 0px"
+        };
+
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.classList.add('visible');
+                    observer.unobserve(entry.target); // Only animate once
+                }
+            });
+        }, observerOptions);
+
+        document.querySelectorAll('.fade-in').forEach(el => {
+            observer.observe(el);
+        });
+
+        // Mobile Menu Toggle (Simple implementation)
+        const menuToggle = document.querySelector('.menu-toggle');
+        const navLinks = document.querySelector('.nav-links');
+
+        menuToggle.addEventListener('click', () => {
+            const isFlex = navLinks.style.display === 'flex';
+            navLinks.style.display = isFlex ? 'none' : 'flex';
+            
+            if (!isFlex) {
+                navLinks.style.flexDirection = 'column';
+                navLinks.style.position = 'absolute';
+                navLinks.style.top = '70px';
+                navLinks.style.left = '0';
+                navLinks.style.width = '100%';
+                navLinks.style.background = 'white';
+                navLinks.style.padding = '20px';
+                navLinks.style.boxShadow = '0 10px 20px rgba(0,0,0,0.05)';
+            }
+        });
+    </script>
+</body>
+</html>

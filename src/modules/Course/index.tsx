@@ -8,13 +8,14 @@ import ShareSheet from '@/components/ShareSheet';
 export default function Course() {
   const theme = useTheme();
   const [shareVisible, setShareVisible] = useState(false);
+  const [headerTitle, setHeaderTitle] = useState('课程表');
 
   return (
     <View style={[styles['course__screen'], { backgroundColor: theme.colors.background }]}>
       <TopTab />
       
       <View style={styles.header}>
-        <Text variant="headlineSmall" style={[styles.title, { color: theme.colors.onBackground }]}>课程表</Text>
+        <Text variant="headlineSmall" style={[styles.title, { color: theme.colors.onBackground }]}>{headerTitle}</Text>
         <IconButton 
           icon="share-variant" 
           mode="contained-tonal"
@@ -23,7 +24,7 @@ export default function Course() {
         />
       </View>
 
-      <CourseTable />
+      <CourseTable onTitleChange={setHeaderTitle} />
       
       <ShareSheet 
         visible={shareVisible} 

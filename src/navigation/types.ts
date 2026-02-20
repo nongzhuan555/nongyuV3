@@ -12,6 +12,7 @@ export type RootStackParamList = {
   JiaowuRank: undefined;
   JiaowuScore: undefined;
   JiaowuCompetition: undefined;
+  JiaowuExam: undefined;
   SecondHome: undefined;
   SecondLogin: undefined;
   SecondActivityList: undefined;

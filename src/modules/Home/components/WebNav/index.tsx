@@ -10,53 +10,52 @@ import { profileStore } from '@/stores/profile';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 type WebItem = {
-  img: string;
   text: string;
   url: string;
 };
 
 const list1: WebItem[] = [
-  { img: 'static/icons/logo.png', text: '川农官网', url: 'https://www.sicau.edu.cn/index.jsp' },
-  { img: 'static/icons/jiaowu.png', text: '教务网', url: 'https://jiaowu.sicau.edu.cn/web/web/web/index.asp' },
-  { img: 'https://xgxt.sicau.edu.cn/sys/SystemForm/MImages/07.jpg', text: '学工系统', url: 'https://xgxt.sicau.edu.cn/sys/SystemForm/main.htm' },
-  { img: 'static/icons/logo.jpg', text: '后勤官网', url: 'https://hqfw.sicau.edu.cn/' },
-  { img: 'https://busticket.sicau.edu.cn/img/favicon/favicon.png', text: '校车官网', url: 'https://busticket.sicau.edu.cn/' },
-  { img: 'static/icons/Library.png', text: '图书馆', url: 'https://lib.sicau.edu.cn/LibSicau/' },
-  { img: 'static/icons/cet.jpg', text: '四六级', url: 'https://cet.neea.edu.cn/' },
-  { img: 'static/icons/ncr.jpg', text: '计算机', url: 'https://ncre.neea.edu.cn/' },
+  { text: '川农官网', url: 'https://www.sicau.edu.cn/index.jsp' },
+  { text: '教务网', url: 'https://jiaowu.sicau.edu.cn/web/web/web/index.asp' },
+  { text: '学工系统', url: 'https://xgxt.sicau.edu.cn/sys/SystemForm/main.htm' },
+  { text: '后勤官网', url: 'https://hqfw.sicau.edu.cn/' },
+  { text: '校车官网', url: 'https://busticket.sicau.edu.cn/' },
+  { text: '川农图书馆', url: 'https://lib.sicau.edu.cn/LibSicau/' },
+  { text: '四六级报名', url: 'https://cet.neea.edu.cn/' },
+  { text: '计算机等级', url: 'https://ncre.neea.edu.cn/' },
 ];
 
 const list2: WebItem[] = [
-  { img: 'https://xxgc.sicau.edu.cn/280-200.gif', text: '信息工程', url: 'https://xxgc.sicau.edu.cn/' },
-  { img: 'static/icons/resources.png', text: '资源学院', url: 'https://zyxy.sicau.edu.cn/' },
-  { img: 'static/icons/horticulture.png', text: '园艺学院', url: 'https://yyx.sicau.edu.cn/' },
-  { img: 'static/icons/art.png', text: '艺术传媒', url: 'https://yscm.sicau.edu.cn/' },
-  { img: 'static/icons/civil.png', text: '土木工程', url: 'https://tmgcxy.sicau.edu.cn/' },
-  { img: 'static/icons/sports.png', text: '体育学院', url: 'https://ytxy.sicau.edu.cn/' },
-  { img: 'static/icons/water.png', text: '水利水电', url: 'https://slsd.sicau.edu.cn/' },
-  { img: 'static/icons/food.png', text: '食品学院', url: 'https://spxy.sicau.edu.cn/' },
+  { text: '信息工程学院', url: 'https://xxgc.sicau.edu.cn/' },
+  { text: '资源学院', url: 'https://zyxy.sicau.edu.cn/' },
+  { text: '园艺学院', url: 'https://yyx.sicau.edu.cn/' },
+  { text: '艺术传媒学院', url: 'https://yscm.sicau.edu.cn/' },
+  { text: '土木工程学院', url: 'https://tmgcxy.sicau.edu.cn/' },
+  { text: '体育学院', url: 'https://ytxy.sicau.edu.cn/' },
+  { text: '水利水电学院', url: 'https://slsd.sicau.edu.cn/' },
+  { text: '食品学院', url: 'https://spxy.sicau.edu.cn/' },
 ];
 
 const list3: WebItem[] = [
-  { img: 'static/icons/life.png', text: '生命科学', url: 'https://smkx.sicau.edu.cn/' },
-  { img: 'static/icons/tour.png', text: '商旅学院', url: 'https://slxy.sicau.edu.cn/' },
-  { img: 'static/icons/read.png', text: '人文学院', url: 'https://rwy.sicau.edu.cn/' },
-  { img: 'static/icons/agriculture.png', text: '农学院', url: 'https://nxy.sicau.edu.cn/' },
-  { img: 'static/icons/forestry.png', text: '林学院', url: 'https://lxy.sicau.edu.cn/' },
-  { img: 'static/icons/science.png', text: '理学院', url: 'https://lixueyuan.sicau.edu.cn/' },
-  { img: 'static/icons/economics.png', text: '经济学院', url: 'https://jjxy.sicau.edu.cn/' },
-  { img: 'static/icons/ME.png', text: '机电学院', url: 'https://jdxy.sicau.edu.cn/' },
+  { text: '生命科学', url: 'https://smkx.sicau.edu.cn/' },
+  { text: '商旅学院', url: 'https://slxy.sicau.edu.cn/' },
+  { text: '人文学院', url: 'https://rwy.sicau.edu.cn/' },
+  { text: '农学院', url: 'https://nxy.sicau.edu.cn/' },
+  { text: '林学院', url: 'https://lxy.sicau.edu.cn/' },
+  { text: '理学院', url: 'https://lixueyuan.sicau.edu.cn/' },
+  { text: '经济学院', url: 'https://jjxy.sicau.edu.cn/' },
+  { text: '机电学院', url: 'https://jdxy.sicau.edu.cn/' },
 ];
 
 const list4: WebItem[] = [
-  { img: 'static/icons/planning.png', text: '建筑城乡', url: 'https://jg.sicau.edu.cn/' },
-  { img: 'static/icons/environment.png', text: '环境学院', url: 'https://hjxy.sicau.edu.cn/' },
-  { img: 'static/icons/management.png', text: '管理学院', url: 'https://glxy.sicau.edu.cn/' },
-  { img: 'static/icons/public.png', text: '公共管理', url: 'https://fpa.sicau.edu.cn/' },
-  { img: 'static/icons/landscape.png', text: '风景园林', url: 'https://fjylxy.sicau.edu.cn/' },
-  { img: 'static/icons/law.png', text: '法学院', url: 'https://fxy.sicau.edu.cn/' },
-  { img: 'static/icons/veterinary.png', text: '动物医学', url: 'https://dyy.sicau.edu.cn/' },
-  { img: 'static/icons/grassland.png', text: '草业科技', url: 'https://cgst.sicau.edu.cn/index.jsp' },
+  { text: '建筑城乡学院', url: 'https://jg.sicau.edu.cn/' },
+  { text: '环境学院', url: 'https://hjxy.sicau.edu.cn/' },
+  { text: '管理学院', url: 'https://glxy.sicau.edu.cn/' },
+  { text: '公共管理学院', url: 'https://fpa.sicau.edu.cn/' },
+  { text: '风景园林学院', url: 'https://fjylxy.sicau.edu.cn/' },
+  { text: '法学院', url: 'https://fxy.sicau.edu.cn/' },
+  { text: '动物医学学院', url: 'https://dyy.sicau.edu.cn/' },
+  { text: '草业科技学院', url: 'https://cgst.sicau.edu.cn/index.jsp' },
 ];
 
 const WebNav = observer(() => {

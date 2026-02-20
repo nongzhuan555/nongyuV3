@@ -1,7 +1,7 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useCallback } from 'react';
 import { View, StyleSheet, ScrollView, RefreshControl, Dimensions, ActivityIndicator } from 'react-native';
 import { Text, Avatar, useTheme, Appbar, Divider, ProgressBar, Surface, Icon, Snackbar, Portal, Button } from 'react-native-paper';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import useSWR from 'swr';
 import { observer } from 'mobx-react-lite';
@@ -136,7 +136,7 @@ function SecondUserInfo() {
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
   const theme = useTheme();
-  
+
   const { data, error, isLoading, mutate } = useSWR<UserData>(
     profileStore.profile.studentId ? `second/userInfo/${profileStore.profile.studentId}` : null,
     fetcher,

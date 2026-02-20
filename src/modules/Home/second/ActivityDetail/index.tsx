@@ -1,8 +1,10 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { View, ScrollView, StyleSheet, Image, ActivityIndicator, Alert } from 'react-native';
 import { Text, Button, Chip, Divider, useTheme, Appbar, Card, Paragraph, Title, Portal, Dialog } from 'react-native-paper';
-import { useRoute, useNavigation, RouteProp } from '@react-navigation/native';
+import { useRoute, useNavigation, RouteProp, useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { observer } from 'mobx-react-lite';
+import { profileStore } from '@/stores/profile';
 import api from '../api';
 import { RootStackParamList } from '@/navigation/types';
 
@@ -26,7 +28,7 @@ type ActivityDetail = {
   canJoin: string;
 };
 
-export default function SecondActivityDetail() {
+function SecondActivityDetail() {
   const route = useRoute<DetailRouteProp>();
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
@@ -179,6 +181,8 @@ export default function SecondActivityDetail() {
     </View>
   );
 }
+
+export default observer(SecondActivityDetail);
 
 const styles = StyleSheet.create({
   container: {

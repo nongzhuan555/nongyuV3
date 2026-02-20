@@ -29,7 +29,9 @@ import ScoreList from '@/modules/Home/jiaowu/score';
 import NoticeDetail from '@/modules/Home/notice';
 import JiaowuNotice from '@/modules/Home/jiaowu/notice';
 import JiaowuCompetition from '@/modules/Home/jiaowu/competition';
+import JiaowuExam from '@/modules/Home/jiaowu/exam';
 import WebViewScreen from '@/components/WebViewScreen';
+import Profile from '@/modules/Profile';
 import Setting from '@/modules/Profile/components/Setting';
 import { RootStackParamList } from '@/navigation/types';
 import ErrorBoundary from '@/shared/components/ErrorBoundary';
@@ -50,26 +52,36 @@ const AppContent = observer(() => {
     return () => setRequestErrorHandler(null);
   }, []);
 
+  const isNongyuLogged = !!profileStore.profile?.studentId?.trim();
+
   return (
     <>
       <ErrorBoundary>
         <NavigationContainer theme={themeStore.navTheme}>
           <Stack.Navigator screenOptions={{ headerShown: false }}>
-            <Stack.Screen name="RootTabs" component={RootTabs} />
-            <Stack.Screen name="JiaowuHome" component={JiaowuHome} />
-            <Stack.Screen name="JiaowuProgress" component={ProgressList} />
-            <Stack.Screen name="JiaowuRank" component={RankList} />
-            <Stack.Screen name="JiaowuScore" component={ScoreList} />
-            <Stack.Screen name="SecondHome" component={SecondHome} />
-            <Stack.Screen name="SecondLogin" component={SecondLogin} />
-            <Stack.Screen name="SecondActivityList" component={SecondActivityList} />
-            <Stack.Screen name="SecondActivityDetail" component={SecondActivityDetail} />
-            <Stack.Screen name="SecondUserInfo" component={SecondUserInfo} />
-            <Stack.Screen name="NoticeDetail" component={NoticeDetail} />
-            <Stack.Screen name="JiaowuNotice" component={JiaowuNotice} />
-            <Stack.Screen name="JiaowuCompetition" component={JiaowuCompetition} />
-            <Stack.Screen name="WebViewScreen" component={WebViewScreen} />
-            <Stack.Screen name="ProfileSetting" component={Setting} />
+            {!isNongyuLogged ? (
+              // @ts-ignore
+              <Stack.Screen name="Login" component={Profile} />
+            ) : (
+              <>
+                <Stack.Screen name="RootTabs" component={RootTabs} />
+                <Stack.Screen name="JiaowuHome" component={JiaowuHome} />
+                <Stack.Screen name="JiaowuProgress" component={ProgressList} />
+                <Stack.Screen name="JiaowuRank" component={RankList} />
+                <Stack.Screen name="JiaowuScore" component={ScoreList} />
+                <Stack.Screen name="SecondHome" component={SecondHome} />
+                <Stack.Screen name="SecondLogin" component={SecondLogin} />
+                <Stack.Screen name="SecondActivityList" component={SecondActivityList} />
+                <Stack.Screen name="SecondActivityDetail" component={SecondActivityDetail} />
+                <Stack.Screen name="SecondUserInfo" component={SecondUserInfo} />
+                <Stack.Screen name="NoticeDetail" component={NoticeDetail} />
+                <Stack.Screen name="JiaowuNotice" component={JiaowuNotice} />
+                <Stack.Screen name="JiaowuCompetition" component={JiaowuCompetition} />
+                <Stack.Screen name="JiaowuExam" component={JiaowuExam} />
+                <Stack.Screen name="WebViewScreen" component={WebViewScreen} />
+                <Stack.Screen name="ProfileSetting" component={Setting} />
+              </>
+            )}
           </Stack.Navigator>
         </NavigationContainer>
       </ErrorBoundary>

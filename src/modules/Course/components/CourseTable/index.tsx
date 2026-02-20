@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Dimensions, ScrollView, StyleSheet, TouchableOpacity, View, Animated, Easing, Pressable, Platform, BackHandler } from 'react-native';
+import { Dimensions, ScrollView, StyleSheet, TouchableOpacity, View, Animated, Easing, Pressable, Platform, BackHandler, FlatList } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Button, Text, useTheme, TextInput, Chip, MD3Theme, Snackbar, ActivityIndicator } from 'react-native-paper';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -7,6 +7,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import courseData from '@/jiaowu/course/course.json';
 import { fetchCourseSchedule, CourseScheduleData } from '@/jiaowu/course/schedule';
 import CourseDetailModal from './CourseDetailModal';
+import ExamSchedule from '../ExamSchedule';
 import { CourseEntry, AttendanceRecord, WeekRange } from './types';
 import { profileStore } from '@/stores/profile';
 import { observer } from 'mobx-react-lite';
@@ -238,7 +239,165 @@ function buildWeekMatrix(
   return weeks;
 }
 
-function CourseTable() {
+const WeekSlide = React.memo(({
+  weekIndex,
+  grid,
+  maxWeek,
+  curWeekIndex,
+  width,
+  pageHeight,
+  theme,
+  styles,
+  armedCell,
+  onCellPress,
+  onModalOpen,
+  onGoThisWeek,
+}: {
+  weekIndex: number;
+  grid: Array<Array<CourseEntry[]>>;
+  maxWeek: number;
+  curWeekIndex: number;
+  width: number;
+  pageHeight: number;
+  theme: MD3Theme;
+  styles: any;
+  armedCell: { week: number; c: number; r: number } | null;
+  onCellPress: (week: number, c: number, r: number) => void;
+  onModalOpen: (course: CourseEntry) => void;
+  onGoThisWeek: () => void;
+}) => {
+  const [hoverThisWeek, setHoverThisWeek] = useState(false);
+  const dates = useMemo(() => getWeekDates(weekIndex + 1), [weekIndex]);
+  const mon = useMemo(() => mondayOfWeek(weekIndex + 1), [weekIndex]);
+  const today = useMemo(() => new Date(), []);
+
+  const isCurrentWeek = weekIndex === curWeekIndex;
+
+  return (
+    <View style={{ width }}>
+      <View style={styles.grid}>
+        {/* 固定表头 */}
+        <View style={[styles.headerRow]}>
+          <View style={[styles.headerCell, styles.timeCell]}>
+            <Text style={styles.headerWeekText}>第{weekIndex + 1}周</Text>
+            <Text style={styles.headerWeekSub}>共{maxWeek}周</Text>
+          </View>
+          {['周一','周二','周三','周四','周五','周六','周日'].map((d, i) => {
+            const cur = new Date(mon.getFullYear(), mon.getMonth(), mon.getDate() + i);
+            const isToday = isSameDay(cur, today);
+            return (
+              <View key={i} style={[styles.headerCell, isToday && styles.headerCellToday]}>
+                <Text style={[styles.headerText, isToday && styles.headerToday]}>{d}</Text>
+                <Text style={[styles.dateText, isToday && styles.headerToday]}>{dates[i]}</Text>
+              </View>
+            );
+          })}
+        </View>
+
+        {/* 可滚动课程内容 */}
+        <ScrollView
+          style={{ maxHeight: pageHeight }}
+          nestedScrollEnabled
+          showsVerticalScrollIndicator
+        >
+          {grid.map((row, rIdx) => (
+            <View key={rIdx} style={styles.row}>
+              <View style={[styles.cell, styles.timeCell]}>
+                <View style={styles.timeSlot}>
+                  <Text style={styles.timeValue}>{COURSE_TIMES[rIdx * 2]?.start}</Text>
+                  <Text style={styles.timeIndex}>{rIdx * 2 + 1}</Text>
+                  <Text style={styles.timeValue}>{COURSE_TIMES[rIdx * 2]?.end}</Text>
+                </View>
+                <View style={styles.timeSlot}>
+                  <Text style={styles.timeValue}>{COURSE_TIMES[rIdx * 2 + 1]?.start}</Text>
+                  <Text style={styles.timeIndex}>{rIdx * 2 + 2}</Text>
+                  <Text style={styles.timeValue}>{COURSE_TIMES[rIdx * 2 + 1]?.end}</Text>
+                </View>
+              </View>
+              {row.map((cell, cIdx) => {
+                const course = cell[0];
+                const colors = course ? getCourseColor(course.name) : null;
+                const isArmed = armedCell && armedCell.week === weekIndex && armedCell.c === cIdx && armedCell.r === rIdx;
+                return (
+                  <View key={cIdx} style={styles.cell}>
+                    {cell.length > 0 ? (
+                      <Pressable
+                        onPress={() => onModalOpen(cell[0])}
+                        style={({ pressed }) => [
+                          { flex: 1 },
+                          pressed && {
+                            transform: [{ scale: 0.95 }],
+                          }
+                        ]}
+                      >
+                        <View style={[styles.card, { backgroundColor: colors?.bg }]}>
+                          <Text numberOfLines={4} style={[styles.cardTitle, { color: colors?.text, backgroundColor: 'transparent' }]}>{cell[0].name}</Text>
+                          {!!cell[0].room && <Text numberOfLines={2} style={[styles.cardDesc, { color: colors?.text, backgroundColor: 'transparent' }]}>{cell[0].room}</Text>}
+                          {!!cell[0].teacher && <Text numberOfLines={1} style={[styles.cardDesc, { color: colors?.text, backgroundColor: 'transparent' }]}>{cell[0].teacher}</Text>}
+                        </View>
+                      </Pressable>
+                    ) : (
+                      <Pressable 
+                        style={[
+                          styles.emptyHit, 
+                          isArmed && { 
+                            backgroundColor: theme.colors.primaryContainer + '20',
+                            borderRadius: 8 
+                          }
+                        ]} 
+                        onPress={() => onCellPress(weekIndex, cIdx, rIdx)}
+                      >
+                        {isArmed ? (
+                          <View style={[styles.plusBtn, { backgroundColor: theme.colors.primary, shadowColor: theme.colors.shadow }]}>
+                            <MaterialCommunityIcons name="plus" size={20} color={theme.colors.onPrimary} />
+                          </View>
+                        ) : null}
+                      </Pressable>
+                    )}
+                  </View>
+                );
+              })}
+            </View>
+          ))}
+        </ScrollView>
+      </View>
+      {!isCurrentWeek ? (
+        <Pressable
+          onHoverIn={() => setHoverThisWeek(true)}
+          onHoverOut={() => setHoverThisWeek(false)}
+          style={[
+            styles.thisWeekBtnWrap,
+            Platform.OS === 'web' ? { opacity: hoverThisWeek ? 1 : 0 } : { opacity: 1 },
+          ]}
+        >
+          <Pressable onPress={onGoThisWeek} style={[styles.thisWeekBtn, { backgroundColor: theme.colors.primary }]}>
+            <MaterialCommunityIcons name="undo" size={22} color={theme.colors.onPrimary} />
+          </Pressable>
+        </Pressable>
+      ) : null}
+    </View>
+  );
+}, (prev, next) => {
+  const prevArmed = prev.armedCell && prev.armedCell.week === prev.weekIndex;
+  const nextArmed = next.armedCell && next.armedCell.week === next.weekIndex;
+  // If armed state for this week changed
+  if (!!prevArmed !== !!nextArmed) return false;
+  // If both armed, check if position changed
+  if (prevArmed && nextArmed) {
+    if (prev.armedCell?.c !== next.armedCell?.c || prev.armedCell?.r !== next.armedCell?.r) return false;
+  }
+  
+  return (
+    prev.weekIndex === next.weekIndex &&
+    prev.maxWeek === next.maxWeek &&
+    prev.curWeekIndex === next.curWeekIndex &&
+    prev.width === next.width &&
+    prev.pageHeight === next.pageHeight &&
+    prev.grid === next.grid
+  );
+});
+
+function CourseTable({ onTitleChange }: { onTitleChange?: (title: string) => void }) {
   const theme = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
   const insets = useSafeAreaInsets();
@@ -246,6 +405,7 @@ function CourseTable() {
   const [scheduleData, setScheduleData] = useState<CourseScheduleData>(courseData as any);
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [containerHeight, setContainerHeight] = useState(0);
 
   const COURSE_STORAGE_KEY = 'JIAOWU_COURSE_DATA';
   const CUSTOM_COURSE_STORAGE_KEY = 'JIAOWU_CUSTOM_COURSE_DATA';
@@ -315,9 +475,21 @@ function CourseTable() {
   const weeks = useMemo(() => buildWeekMatrix(maxWeek, allCourses, isSuppressed), [maxWeek, allCourses]);
   const width = Dimensions.get('window').width;
   const height = Dimensions.get('window').height;
-  const svRef = useRef<ScrollView>(null);
+  const flatListRef = useRef<FlatList>(null);
   const initialWeek = Math.min(maxWeek, Math.max(1, computeCurrentWeek()));
   const [active, setActive] = useState(initialWeek - 1);
+
+  // Sync title with parent
+  useEffect(() => {
+    if (onTitleChange) {
+      if (active === maxWeek) {
+        onTitleChange('考试安排（正考）');
+      } else {
+        onTitleChange('课程表');
+      }
+    }
+  }, [active, maxWeek, onTitleChange]);
+
   const [selected, setSelected] = useState<CourseEntry | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
   const [confirmVisible, setConfirmVisible] = useState(false);
@@ -334,19 +506,22 @@ function CourseTable() {
   const [addTeacher, setAddTeacher] = useState('');
   const [addType, setAddType] = useState<'course' | 'schedule'>('schedule');
   const [addWeeks, setAddWeeks] = useState<number[]>([]);
-  const [armedCell, setArmedCell] = useState<{ c: number; r: number } | null>(null);
+  const [armedCell, setArmedCell] = useState<{ week: number; c: number; r: number } | null>(null);
   const armedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     setTimeout(() => {
-      svRef.current?.scrollTo({ x: active * width, animated: false });
+      // FlatList scrollToIndex
+      if (flatListRef.current && active < maxWeek + 1) {
+         flatListRef.current.scrollToIndex({ index: active, animated: false });
+      }
     }, 0);
   }, [width]);
 
   const goThisWeek = () => {
     const w = Math.min(maxWeek, Math.max(1, computeCurrentWeek())) - 1;
     setActive(w);
-    svRef.current?.scrollTo({ x: w * width, animated: true });
+    flatListRef.current?.scrollToIndex({ index: w, animated: true });
   };
 
   const weeksOfCourse = (course: CourseEntry, maxWeekLocal: number) => {
@@ -398,20 +573,16 @@ function CourseTable() {
 
   const closeModal = useCallback(() => {
     setModalVisible(false);
-    // setSelected(null); // Delay clearing selected until modal is hidden (Paper Modal animation)
-    // Actually, Paper Modal doesn't have a callback for "fully hidden".
-    // We can just keep selected or clear it. If we clear it immediately, the modal content might flicker to empty before closing.
-    // So let's NOT clear selected here, or clear it after a timeout.
-    // For now, just close it.
+    // setSelected(null); 
   }, []);
 
-  const openAdd = useCallback((day: number, slot: number) => {
+  const openAdd = useCallback((day: number, slot: number, targetWeek?: number) => {
     setAddTarget({ day, slot });
     setAddTitle('');
     setAddRoom('');
     setAddTeacher('');
     setAddType('schedule');
-    setAddWeeks([active + 1]); // 默认选择当前周
+    setAddWeeks([targetWeek !== undefined ? targetWeek + 1 : active + 1]); // 默认选择当前周
     setAddVisible(true);
     addFade.setValue(0);
     addScale.setValue(0.96);
@@ -501,26 +672,26 @@ function CourseTable() {
     closeAdd();
   };
 
-  const handleEmptyCellPress = (cIdx: number, rIdx: number) => {
-    if (armedCell && armedCell.c === cIdx && armedCell.r === rIdx) {
+  const handleEmptyCellPress = useCallback((week: number, cIdx: number, rIdx: number) => {
+    if (armedCell && armedCell.week === week && armedCell.c === cIdx && armedCell.r === rIdx) {
       if (armedTimer.current) {
         clearTimeout(armedTimer.current);
         armedTimer.current = null;
       }
       setArmedCell(null);
-      openAdd(cIdx, rIdx);
+      openAdd(cIdx, rIdx, week);
     } else {
       if (armedTimer.current) {
         clearTimeout(armedTimer.current);
         armedTimer.current = null;
       }
-      setArmedCell({ c: cIdx, r: rIdx });
+      setArmedCell({ week, c: cIdx, r: rIdx });
       armedTimer.current = setTimeout(() => {
         setArmedCell(null);
         armedTimer.current = null;
       }, 1800);
     }
-  };
+  }, [armedCell, openAdd]);
 
   const isSuppressed = (course: CourseEntry, week: number) => {
     const keyMatch = (s: Suppression) =>
@@ -582,125 +753,56 @@ function CourseTable() {
   };
 
   const curWeekIndex = Math.min(maxWeek, Math.max(1, computeCurrentWeek())) - 1;
-  const [hoverThisWeek, setHoverThisWeek] = useState(false);
 
-  const renderedWeeks = useMemo(() => weeks.map((grid, idx) => {
-    const dates = getWeekDates(idx + 1);
-    const mon = mondayOfWeek(idx + 1);
-    const today = new Date();
-    const pageHeight = Math.max(400, height - 24 - insets.top);
+  const renderItem = useCallback(({ item, index }: { item: any, index: number }) => {
+    const pageHeight = containerHeight > 0 ? containerHeight : Math.max(400, height - 24 - insets.top);
+    
+    if (index === maxWeek) {
+       return (
+         <View style={{ width, height: pageHeight }}>
+            <ExamSchedule />
+         </View>
+       );
+    }
+
     return (
-      <View key={idx} style={{ width }}>
-        <View style={styles.grid}>
-          {/* 固定表头 */}
-          <View style={[styles.headerRow]}>
-            <View style={[styles.headerCell, styles.timeCell]}>
-              <Text style={styles.headerWeekText}>第{idx + 1}周</Text>
-              <Text style={styles.headerWeekSub}>共{maxWeek}周</Text>
-            </View>
-            {['周一','周二','周三','周四','周五','周六','周日'].map((d, i) => {
-              const cur = new Date(mon.getFullYear(), mon.getMonth(), mon.getDate() + i);
-              const isToday = isSameDay(cur, today);
-              return (
-                <View key={i} style={[styles.headerCell, isToday && styles.headerCellToday]}>
-                  <Text style={[styles.headerText, isToday && styles.headerToday]}>{d}</Text>
-                  <Text style={[styles.dateText, isToday && styles.headerToday]}>{dates[i]}</Text>
-                </View>
-              );
-            })}
-          </View>
-
-          {/* 可滚动课程内容 */}
-          <ScrollView
-            style={{ maxHeight: pageHeight }}
-            nestedScrollEnabled
-            showsVerticalScrollIndicator
-          >
-            {grid.map((row, rIdx) => (
-              <View key={rIdx} style={styles.row}>
-                <View style={[styles.cell, styles.timeCell]}>
-                  <View style={styles.timeSlot}>
-                    <Text style={styles.timeValue}>{COURSE_TIMES[rIdx * 2]?.start}</Text>
-                    <Text style={styles.timeIndex}>{rIdx * 2 + 1}</Text>
-                    <Text style={styles.timeValue}>{COURSE_TIMES[rIdx * 2]?.end}</Text>
-                  </View>
-                  <View style={styles.timeSlot}>
-                    <Text style={styles.timeValue}>{COURSE_TIMES[rIdx * 2 + 1]?.start}</Text>
-                    <Text style={styles.timeIndex}>{rIdx * 2 + 2}</Text>
-                    <Text style={styles.timeValue}>{COURSE_TIMES[rIdx * 2 + 1]?.end}</Text>
-                  </View>
-                </View>
-                {row.map((cell, cIdx) => {
-                  const course = cell[0];
-                  const colors = course ? getCourseColor(course.name) : null;
-                  const isArmed = armedCell && armedCell.c === cIdx && armedCell.r === rIdx;
-                  return (
-                    <View key={cIdx} style={styles.cell}>
-                      {cell.length > 0 ? (
-                        <Pressable
-                          onPress={() => openModal(cell[0])}
-                          style={({ pressed }) => [
-                            { flex: 1 },
-                            pressed && {
-                              transform: [{ scale: 0.95 }], // 仅保留轻微缩放，移除透明度变化
-                            }
-                          ]}
-                        >
-                          <View style={[styles.card, { backgroundColor: colors?.bg }]}>
-                            <Text numberOfLines={4} style={[styles.cardTitle, { color: colors?.text, backgroundColor: 'transparent' }]}>{cell[0].name}</Text>
-                            {!!cell[0].room && <Text numberOfLines={2} style={[styles.cardDesc, { color: colors?.text, backgroundColor: 'transparent' }]}>{cell[0].room}</Text>}
-                            {!!cell[0].teacher && <Text numberOfLines={1} style={[styles.cardDesc, { color: colors?.text, backgroundColor: 'transparent' }]}>{cell[0].teacher}</Text>}
-                          </View>
-                        </Pressable>
-                      ) : (
-                        <Pressable 
-                          style={[
-                            styles.emptyHit, 
-                            isArmed && { 
-                              backgroundColor: theme.colors.primaryContainer + '20', // 极淡的背景色
-                              borderRadius: 8 
-                            }
-                          ]} 
-                          onPress={() => handleEmptyCellPress(cIdx, rIdx)}
-                        >
-                          {isArmed ? (
-                            <View style={[styles.plusBtn, { backgroundColor: theme.colors.primary, shadowColor: theme.colors.shadow }]}>
-                              <MaterialCommunityIcons name="plus" size={20} color={theme.colors.onPrimary} />
-                            </View>
-                          ) : null}
-                        </Pressable>
-                      )}
-                    </View>
-                  );
-                })}
-              </View>
-            ))}
-          </ScrollView>
-        </View>
-        {idx !== curWeekIndex ? (
-          <Pressable
-            onHoverIn={() => setHoverThisWeek(true)}
-            onHoverOut={() => setHoverThisWeek(false)}
-            style={[
-              styles.thisWeekBtnWrap,
-              Platform.OS === 'web' ? { opacity: hoverThisWeek ? 1 : 0 } : { opacity: 1 },
-            ]}
-          >
-            <Pressable onPress={goThisWeek} style={[styles.thisWeekBtn, { backgroundColor: theme.colors.primary }]}>
-              <MaterialCommunityIcons name="undo" size={22} color={theme.colors.onPrimary} />
-            </Pressable>
-          </Pressable>
-        ) : null}
-      </View>
+      <WeekSlide
+        weekIndex={index}
+        grid={weeks[index]}
+        maxWeek={maxWeek}
+        curWeekIndex={curWeekIndex}
+        width={width}
+        pageHeight={pageHeight}
+        theme={theme}
+        styles={styles}
+        armedCell={armedCell}
+        onCellPress={handleEmptyCellPress}
+        onModalOpen={openModal}
+        onGoThisWeek={goThisWeek}
+      />
     );
-  }), [weeks, curWeekIndex, armedCell, hoverThisWeek, openModal, handleEmptyCellPress, goThisWeek, width, height, insets, theme]);
+  }, [weeks, maxWeek, curWeekIndex, width, height, insets, theme, styles, armedCell, handleEmptyCellPress, openModal, goThisWeek, containerHeight]);
 
   return (
-    <View style={styles.wrap}>
-      <ScrollView
-        ref={svRef}
+    <View style={styles.wrap} onLayout={(e) => setContainerHeight(e.nativeEvent.layout.height)}>
+      <FlatList
+        ref={flatListRef}
+        data={Array.from({ length: maxWeek + 1 })}
+        renderItem={renderItem}
         horizontal
         pagingEnabled
+        showsHorizontalScrollIndicator={false}
+        keyExtractor={(_, index) => index.toString()}
+        getItemLayout={(_, index) => ({
+          length: width,
+          offset: width * index,
+          index,
+        })}
+        initialScrollIndex={active}
+        onMomentumScrollEnd={(e) => {
+          const idx = Math.round(e.nativeEvent.contentOffset.x / width);
+          setActive(idx);
+        }}
         onScrollBeginDrag={() => {
           if (armedTimer.current) {
             clearTimeout(armedTimer.current);
@@ -708,14 +810,12 @@ function CourseTable() {
           }
           setArmedCell(null);
         }}
-        onMomentumScrollEnd={e => {
-          const idx = Math.round(e.nativeEvent.contentOffset.x / width);
-          setActive(idx);
-        }}
-        showsHorizontalScrollIndicator={false}
-      >
-        {renderedWeeks}
-      </ScrollView>
+        windowSize={3}
+        initialNumToRender={1}
+        maxToRenderPerBatch={1}
+        removeClippedSubviews={Platform.OS === 'android'}
+      />
+
 
       <CourseDetailModal
         visible={modalVisible}

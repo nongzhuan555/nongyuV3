@@ -1,11 +1,14 @@
-import React from 'react';
-import { ScrollView, StyleSheet, View } from 'react-native';
-import { Button, Text, useTheme, Surface, Icon, TouchableRipple, Appbar } from 'react-native-paper';
+import React, { useState } from 'react';
+import { ScrollView, StyleSheet, View, Alert } from 'react-native';
+import { Button, Text, useTheme, Surface, Icon, TouchableRipple, Appbar, Portal, Dialog, TextInput } from 'react-native-paper';
 import JiaowuLoginProbe from '@/modules/Profile/components/JiaowuLoginProbe';
 import { observer } from 'mobx-react-lite';
 import { profileStore } from '@/stores/profile';
 import { useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { fetchCourseSchedule } from '@/jiaowu/course/schedule';
+import { normalizeCourses, COURSE_TIMES } from '@/utils/courseParser';
+import { addEventToCalendar } from '@/utils/calendar';
 
 // 教务入口配置
 const SERVICES = [
@@ -64,7 +67,7 @@ const SERVICES = [
     label: '课表导入', 
     sub: '一键导入课程表到日历',
     page: 'course', 
-    disabled: true,
+    disabled: false,
     icon: 'calendar-import',
     color: '#9E9E9E',
     bgColor: '#F5F5F5'
@@ -74,10 +77,10 @@ const SERVICES = [
     label: '考试安排', 
     sub: '期末考试时间地点查询',
     page: 'exam', 
-    disabled: true,
+    disabled: false,
     icon: 'calendar-clock',
-    color: '#9E9E9E',
-    bgColor: '#F5F5F5'
+    color: '#009688',
+    bgColor: '#E0F2F1'
   },
 ] as const;
 
@@ -86,6 +89,10 @@ const JiaowuHome = observer(() => {
   const insets = useSafeAreaInsets();
   const logged = !!profileStore.profile?.studentId?.trim();
   const theme = useTheme();
+
+  const [importDialogVisible, setImportDialogVisible] = useState(false);
+  const [currentWeekInput, setCurrentWeekInput] = useState('1');
+  const [importing, setImporting] = useState(false);
 
   const handlePress = (item: typeof SERVICES[number]) => {
     if (item.disabled) return;
@@ -100,6 +107,95 @@ const JiaowuHome = observer(() => {
     if (item.page === 'score') navigation.navigate('JiaowuScore' as never);
     if (item.page === 'notice') navigation.navigate('JiaowuNotice' as never);
     if (item.page === 'competition') navigation.navigate('JiaowuCompetition' as never);
+    if (item.page === 'exam') navigation.navigate('JiaowuExam' as never);
+    if (item.page === 'course') {
+        setImportDialogVisible(true);
+    }
+  };
+
+  const handleImportConfirm = async () => {
+      const currentWeek = parseInt(currentWeekInput);
+      if (isNaN(currentWeek) || currentWeek < 1 || currentWeek > 25) {
+        Alert.alert('错误', '请输入有效的周次（1-25）');
+        return;
+      }
+      
+      setImporting(true);
+      try {
+        const data = await fetchCourseSchedule();
+        if (!data || !data.grid) {
+          Alert.alert('错误', '无法获取课表数据');
+          return;
+        }
+        
+        const { courses } = normalizeCourses(data.grid);
+        if (courses.length === 0) {
+          Alert.alert('提示', '本学期没有课程');
+          return;
+        }
+        
+        // Calculate semester start date based on current week
+        // Monday of THIS week
+        const today = new Date();
+        const day = today.getDay() === 0 ? 7 : today.getDay();
+        const diff = today.getDate() - day + 1; 
+        const currentMonday = new Date(today.getFullYear(), today.getMonth(), diff);
+        
+        // Semester start date (Monday of Week 1)
+        const semesterStart = new Date(currentMonday);
+        semesterStart.setDate(semesterStart.getDate() - (currentWeek - 1) * 7);
+        
+        let count = 0;
+        
+        for (const course of courses) {
+            let weeksToSchedule: number[] = [];
+            if (course.weeksList && course.weeksList.length > 0) {
+                weeksToSchedule = course.weeksList;
+            } else {
+                for (let w = course.weeks.start; w <= course.weeks.end; w++) {
+                    if (course.odd && w % 2 === 0) continue;
+                    if (course.even && w % 2 !== 0) continue;
+                    weeksToSchedule.push(w);
+                }
+            }
+            
+            for (const w of weeksToSchedule) {
+                const sessionDate = new Date(semesterStart);
+                sessionDate.setDate(semesterStart.getDate() + (w - 1) * 7 + (course.day - 1));
+                
+                const startT = COURSE_TIMES[course.startPeriod - 1];
+                const endT = COURSE_TIMES[course.endPeriod - 1];
+                
+                if (!startT || !endT) continue;
+                
+                const [sh, sm] = startT.start.split(':').map(Number);
+                const [eh, em] = endT.end.split(':').map(Number);
+                
+                const startDate = new Date(sessionDate);
+                startDate.setHours(sh, sm, 0, 0);
+                
+                const endDate = new Date(sessionDate);
+                endDate.setHours(eh, em, 0, 0);
+                
+                await addEventToCalendar(
+                    course.name,
+                    startDate,
+                    endDate,
+                    course.room,
+                    `教师: ${course.teacher}\n周次: ${w}`
+                );
+                count++;
+            }
+        }
+        
+        Alert.alert('导入成功', `已将 ${count} 节课程导入系统日历`);
+        setImportDialogVisible(false);
+      } catch (e) {
+        console.error(e);
+        Alert.alert('错误', '导入失败，请稍后重试');
+      } finally {
+        setImporting(false);
+      }
   };
 
   return (
@@ -179,6 +275,29 @@ const JiaowuHome = observer(() => {
            <Text variant="bodySmall" style={[styles.footerText, { color: theme.colors.onSurfaceDisabled }]}>© Sichuan Agricultural University</Text>
         </View>
       </ScrollView>
+
+      <Portal>
+        <Dialog visible={importDialogVisible} onDismiss={() => !importing && setImportDialogVisible(false)}>
+            <Dialog.Title>导入课表到日历</Dialog.Title>
+            <Dialog.Content>
+                <Text variant="bodyMedium" style={{marginBottom: 10}}>
+                    我们将把您的所有课程添加到手机系统日历中。为了确保日期准确，请告诉我们当前是第几周？
+                </Text>
+                <TextInput
+                    label="当前周次"
+                    value={currentWeekInput}
+                    onChangeText={setCurrentWeekInput}
+                    keyboardType="numeric"
+                    mode="outlined"
+                    disabled={importing}
+                />
+            </Dialog.Content>
+            <Dialog.Actions>
+                <Button onPress={() => setImportDialogVisible(false)} disabled={importing}>取消</Button>
+                <Button onPress={handleImportConfirm} loading={importing} disabled={importing}>开始导入</Button>
+            </Dialog.Actions>
+        </Dialog>
+      </Portal>
     </View>
   );
 });

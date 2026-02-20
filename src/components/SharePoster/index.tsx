@@ -22,8 +22,8 @@ const POSTER_WIDTH = width * 0.85;
 // --- 海报配置区域 ---
 const POSTER_CONFIG = {
   appName: '农屿 NongYu',
-  slogan: '专为川农er打造的校园助手App',
-  inviteText: '诚挚推荐您使用农屿',
+  slogan: '川农学子的贴心助手',
+  inviteText: '让校园生活更简单',
   qrCodeUrl: 'https://nongyu.app', // 二维码跳转链接
   scanHint: '长按识别二维码 / 扫码进入农屿官网下载',
 };

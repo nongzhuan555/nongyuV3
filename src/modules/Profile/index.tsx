@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Text, View, StyleSheet, Animated, Easing, Alert, ScrollView, ImageBackground } from 'react-native';
 import { Button, IconButton, Snackbar, Portal, useTheme, Surface, Avatar, List, Divider } from 'react-native-paper';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
 import { observer } from 'mobx-react-lite';
 import JiaowuLoginProbe from './components/JiaowuLoginProbe';
@@ -92,27 +93,45 @@ const Profile = observer(() => {
     const token = profileStore.token?.trim();
     setLogoutLoading(true);
     try {
-      if (!token) {
-        showMessage('未认证');
-        return;
+      // 尝试网络退出，但不阻塞本地清除
+      if (token) {
+        setHttpConfig({ token });
+        try {
+          await post('/logout', undefined, { headers: { Authorization: `Bearer ${token}`, token } });
+        } catch (e) {
+          console.warn('Network logout failed', e);
+        }
       }
-      setHttpConfig({ token });
-      const resp = await post('/logout', undefined, { headers: { Authorization: `Bearer ${token}`, token } });
-      const data = resp?.data as { status?: string; message?: string } | undefined;
-      if (data?.status !== 'ok') {
-        showMessage(data?.message || '退出登录失败');
-        return;
-      }
+      
       await profileStore.clear();
       await themeStore.setMode('light');
       await themeStore.setBrand('default');
+      
+      // 清除其他残留数据
+      try {
+        const allKeys = await AsyncStorage.getAllKeys();
+        const keysToRemove = allKeys.filter(key => 
+          key === 'app:exam:cache' ||
+          key === 'JIAOWU_COURSE_DATA' ||
+          key === 'JIAOWU_CUSTOM_COURSE_DATA' ||
+          key === 'SECOND_CLASS_TOKEN_KEY' ||
+          key === 'app:jiaowu:asp_cookie' ||
+          key.startsWith('weather:openmeteo:') ||
+          key.startsWith('TODO_LIST_')
+        );
+        if (keysToRemove.length > 0) {
+          await AsyncStorage.multiRemove(keysToRemove);
+        }
+      } catch (e) {
+        console.warn('Failed to clear extra storage', e);
+      }
+
       setHttpConfig({ token: '' });
       setLogged(false);
       showMessage('已退出登录', 'success');
     } catch (e) {
       const httpErr = toHttpError(e);
-      const errData = httpErr.data as { message?: string } | undefined;
-      showMessage(errData?.message || httpErr.message || '退出登录失败');
+      showMessage(httpErr.message || '退出登录失败');
     } finally {
       setLogoutLoading(false);
     }
@@ -121,7 +140,7 @@ const Profile = observer(() => {
   const handleLogout = () => {
     Alert.alert(
       '退出登录',
-      '确定要退出登录吗？退出后将清除本地缓存的课程数据。',
+      '确定要退出登录吗？退出后将清除所有本地数据（包括课程、考试、成绩、待办等）。',
       [
         { text: '取消', style: 'cancel' },
         { text: '确定', style: 'destructive', onPress: doLogout },
@@ -129,23 +148,47 @@ const Profile = observer(() => {
     );
   };
 
+  const getGreeting = () => {
+    const hour = new Date().getHours();
+    if (hour < 5) return '夜深了';
+    if (hour < 11) return '早上好';
+    if (hour < 13) return '中午好';
+    if (hour < 18) return '下午好';
+    return '晚上好';
+  };
+
   const renderLoginView = () => (
     <Animated.View
       style={[
         styles.fullScreenLayer,
         {
-          paddingTop: insets.top + 20,
           opacity: loginOpacity,
           transform: [{ translateY: loginTranslate }],
         }
       ]}
       pointerEvents={!logged ? 'auto' : 'none'}
     >
-      <View style={styles.loginContainer}>
-        <Text style={[styles.loginTitle, { color: theme.colors.onSurface }]}>欢迎来到农屿</Text>
-        <Text style={[styles.loginSubtitle, { color: theme.colors.onSurfaceVariant }]}>登录教务系统以使用全部功能</Text>
-        <JiaowuLoginProbe onSuccess={() => setLogged(true)} />
-      </View>
+      <LinearGradient
+        colors={[theme.colors.primaryContainer, theme.colors.background]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 0, y: 1 }}
+        locations={[0, 0.4]}
+        style={styles.loginGradient}
+      >
+        <View style={[styles.loginContainer, { paddingTop: insets.top + 20 }]}>
+          <View style={styles.welcomeHeader}>
+            <View style={[styles.logoContainer, { backgroundColor: theme.colors.secondaryContainer }]}>
+              <MaterialCommunityIcons name="sprout" size={32} color={theme.colors.primary} />
+            </View>
+            <Text style={[styles.greetingText, { color: theme.colors.onSurfaceVariant }]}>{getGreeting()}</Text>
+            <Text style={[styles.loginTitle, { color: theme.colors.onSurface }]}>欢迎来到农屿</Text>
+            <Text style={[styles.loginSubtitle, { color: theme.colors.onSurfaceVariant }]}>
+              请使用教务网登录，开启农屿之旅
+            </Text>
+          </View>
+          <JiaowuLoginProbe onSuccess={() => setLogged(true)} />
+        </View>
+      </LinearGradient>
     </Animated.View>
   );
 
@@ -306,19 +349,46 @@ const styles = StyleSheet.create({
   fullScreenLayer: {
     ...StyleSheet.absoluteFillObject,
   },
-  loginContainer: {
+  loginGradient: {
     flex: 1,
-    paddingHorizontal: 24,
     justifyContent: 'center',
   },
-  loginTitle: {
-    fontSize: 28,
-    fontWeight: 'bold',
+  loginContainer: {
+    flex: 1,
+    paddingHorizontal: 32,
+    justifyContent: 'center',
+  },
+  welcomeHeader: {
+    marginBottom: 56,
+    paddingHorizontal: 4,
+  },
+  logoContainer: {
+    width: 56,
+    height: 56,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 24,
+  },
+  greetingText: {
+    fontSize: 13,
+    fontWeight: '600',
+    letterSpacing: 1.5,
     marginBottom: 8,
+    textTransform: 'uppercase',
+    opacity: 0.8,
+  },
+  loginTitle: {
+    fontSize: 36,
+    fontWeight: 'bold',
+    letterSpacing: -0.5,
+    marginBottom: 12,
   },
   loginSubtitle: {
-    fontSize: 14,
-    marginBottom: 32,
+    fontSize: 15,
+    lineHeight: 24,
+    opacity: 0.6,
+    maxWidth: '90%',
   },
   headerArea: {
     paddingHorizontal: 20,

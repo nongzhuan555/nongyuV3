@@ -30,6 +30,7 @@
     },
     "plugins": [
       "expo-native-wechat",
+
       [
         "expo-media-library",
         {
