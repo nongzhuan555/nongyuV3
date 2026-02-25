@@ -33,7 +33,10 @@ export default function Greeting() {
       const weather = await getWeatherByCampus(campus);
       const weatherText = buildWeatherText(weather.summary, weather.temp);
       const token = profileStore.token?.trim() || '';
-      if (token) setHttpConfig({ token });
+      if (!token) {
+        return;
+      }
+      setHttpConfig({ token });
       const resp = await post('/ai/chat', {
         name,
         weather: weatherText,

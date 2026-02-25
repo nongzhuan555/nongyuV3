@@ -1,0 +1,117 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_container"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="@drawable/widget_background"
+    android:padding="16dp">
+
+    <!-- Header: Label and Time -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:layout_marginBottom="4dp">
+        
+        <TextView
+            android:id="@+id/widget_label_next"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="农屿提醒您，下节课是："
+            android:textSize="10sp"
+            android:textColor="#666666"
+            android:letterSpacing="0.05"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/widget_time_range"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="--:--"
+            android:textSize="14sp"
+            android:textColor="#2196F3"
+            android:textStyle="bold" />
+    </LinearLayout>
+
+    <!-- Course Name -->
+    <TextView
+        android:id="@+id/widget_course_name"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:text="加载中..."
+        android:textSize="20sp"
+        android:textColor="#333333"
+        android:textStyle="bold"
+        android:gravity="center_vertical"
+        android:includeFontPadding="false"
+        android:ellipsize="end"
+        android:maxLines="2" />
+
+    <!-- Details: Teacher and Room -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:layout_marginTop="4dp">
+
+        <TextView
+            android:id="@+id/widget_teacher"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text=""
+            android:textSize="12sp"
+            android:textColor="#666666"
+            android:drawablePadding="4dp" />
+
+        <TextView
+            android:id="@+id/widget_seat"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text=""
+            android:textSize="12sp"
+            android:textColor="#666666"
+            android:layout_marginTop="2dp"
+            android:drawablePadding="4dp" />
+
+        <TextView
+            android:id="@+id/widget_room"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text=""
+            android:textSize="12sp"
+            android:textColor="#666666"
+            android:layout_marginTop="2dp"
+            android:drawablePadding="4dp" />
+    </LinearLayout>
+    
+    <!-- Footer: Date and Update Time -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:layout_marginTop="4dp">
+
+        <TextView
+            android:id="@+id/widget_date"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text=""
+            android:textSize="10sp"
+            android:textColor="#999999" />
+
+        <TextView
+            android:id="@+id/widget_update_time"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text=""
+            android:textSize="8sp"
+            android:textColor="#CCCCCC" />
+    </LinearLayout>
+
+</LinearLayout>

@@ -23,14 +23,22 @@ function stripTags(s: string) {
 }
 
 function parseTable(html: string) {
-  const rows = Array.from(html.matchAll(/<tr[\s\S]*?<\/tr>/gi)).map((m) => m[0]);
-  return rows.map((row) =>
-    Array.from(row.matchAll(/<(td|th)[^>]*>([\s\S]*?)<\/\1>/gi)).map((m) => stripTags(m[2]).trim()),
-  );
+  const rowMatches = html.match(/<tr[\s\S]*?<\/tr>/gi);
+  const rows = rowMatches ? Array.from(rowMatches) : [];
+  
+  return rows.map((row) => {
+    const cellMatches = row.match(/<(td|th)[^>]*>([\s\S]*?)<\/\1>/gi);
+    const cells = cellMatches ? Array.from(cellMatches) : [];
+    return cells.map((cell) => {
+       const content = cell.replace(/^<(td|th)[^>]*>/i, '').replace(/<\/(td|th)>$/i, '');
+       return stripTags(content).trim();
+    });
+  });
 }
 
 function findExamTable(html: string) {
-  const tables = Array.from(html.matchAll(/<table[\s\S]*?<\/table>/gi)).map((m) => m[0]);
+  const tableMatches = html.match(/<table[\s\S]*?<\/table>/gi);
+  const tables = tableMatches ? Array.from(tableMatches) : [];
   const headerKeywords = ['课程', '时间', '地点', '座号', '考试'];
   let best = null;
   let bestScore = -1;

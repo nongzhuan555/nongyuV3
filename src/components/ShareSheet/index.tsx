@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { View, StyleSheet, TouchableOpacity, Modal, Animated, Dimensions, TouchableWithoutFeedback, Share, Platform, Alert, ScrollView, ToastAndroid } from 'react-native';
+import { View, StyleSheet, TouchableOpacity, Modal, Animated, Dimensions, TouchableWithoutFeedback, Share, Platform, Alert, ScrollView, ToastAndroid, Image } from 'react-native';
+import * as FileSystem from 'expo-file-system';
 import { Text, useTheme, Surface, Divider } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
@@ -7,6 +8,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { captureScreen } from 'react-native-view-shot';
 import * as WeChat from '@/utils/wechat';
 import SharePoster from '../SharePoster';
+import analytics from '@/sdk/analytics';
 
 interface ShareSheetProps {
   visible: boolean;
@@ -21,55 +23,41 @@ const ShareSheet: React.FC<ShareSheetProps> = ({ visible, onDismiss, screenshotU
   const [showModal, setShowModal] = useState(false);
   const [loading, setLoading] = useState(false);
   const [posterVisible, setPosterVisible] = useState(false);
-  // const [screenshotUri, setScreenshotUri] = useState<string | null>(null); // Passed as prop now or handled internally? 
-  // Wait, in previous implementation (from Read output), screenshotUri was state inside ShareSheet?
-  // Let's check the Read output again.
-  // Line 23: const [screenshotUri, setScreenshotUri] = useState<string | null>(null);
-  
-  // However, the user request implies capturing screen from outside might be better if we want to capture a specific view?
-  // But captureScreen captures the whole screen.
-  // The user says "Generate poster button is in Profile section".
-  
-  // If I move this component, I should keep the logic.
-  // The previous Read output showed:
-  /*
-  23→  const [screenshotUri, setScreenshotUri] = useState<string | null>(null);
-  ...
-  113→  const handleGeneratePoster = () => {
-  114→    // Close the sheet first
-  115→    onDismiss();
-  116→    
-  117→    // Small delay to allow the sheet to close completely before capturing
-  118→    setTimeout(async () => {
-  119→      try {
-  120→        // Capture the screen
-  121→        const uri = await captureScreen({
-  122→          format: 'jpg',
-  123→          quality: 0.8,
-  124→        });
-  125→        setScreenshotUri(uri);
-  126→        setPosterVisible(true);
-  127→      } catch (e) {
-  128→        console.log('Capture failed', e);
-  129→        setScreenshotUri(null);
-  130→        setPosterVisible(true);
-  131→      }
-  132→    }, 500);
-  133→  };
-  */
-  
-  // So ShareSheet handles the capture itself. This is good.
-  // It captures the screen *after* dismissing itself.
-  // So if I call ShareSheet from Course page, it will dismiss, then capture the Course page.
-  // That is exactly what we want!
-  
-  // So I just need to copy the content exactly as it was.
   
   const slideAnim = useRef(new Animated.Value(SCREEN_HEIGHT)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const [internalScreenshotUri, setInternalScreenshotUri] = useState<string | null>(null);
 
   // WeChat initialization is handled in App.tsx
+  const shareThumbCache = useRef<string | null>(null);
+  const buildShareThumb = async () => {
+    if (shareThumbCache.current) return shareThumbCache.current;
+    try {
+      const mod = await import('expo-image-manipulator');
+      const resolved = Image.resolveAssetSource(require('../../../assets/icon.png'));
+      const uri = resolved?.uri ?? '';
+      const result = await mod.manipulateAsync(
+        uri,
+        [{ resize: { width: 96, height: 96 } }],
+        { compress: 1, format: mod.SaveFormat.PNG, base64: false }
+      );
+      const out = result?.uri ?? '';
+      shareThumbCache.current = out;
+      return out;
+    } catch {
+      const resolved = Image.resolveAssetSource(require('../../../assets/icon.png'));
+      const uri = resolved?.uri ?? '';
+      let out = uri;
+      try {
+        if (uri?.startsWith('file://')) {
+          const b64 = await FileSystem.readAsStringAsync(uri, { encoding: FileSystem.EncodingType.Base64 });
+          out = `data:image/jpeg;base64,${b64}`;
+        }
+      } catch {}
+      shareThumbCache.current = out;
+      return out;
+    }
+  };
 
   useEffect(() => {
     if (visible) {
@@ -116,6 +104,17 @@ const ShareSheet: React.FC<ShareSheetProps> = ({ visible, onDismiss, screenshotU
   };
 
   const handleShare = async (platform: string) => {
+    const platformName = platform === 'wechat' ? '微信好友' : 
+                        platform === 'moments' ? '朋友圈' : 
+                        platform === 'system' ? '系统分享' : 
+                        platform === 'copy' ? '复制链接' : platform;
+                        
+    analytics.trackClick('share_action', 'ShareSheet', {
+      element_name: `分享到${platformName}`,
+      page_name: 'ShareSheet',
+      platform: platform
+    });
+
     if (loading) return;
     setLoading(true);
     try {
@@ -134,7 +133,7 @@ const ShareSheet: React.FC<ShareSheetProps> = ({ visible, onDismiss, screenshotU
                   text: '使用系统分享', 
                   onPress: async () => {
                     await Share.share({
-                      message: '快来加入农屿，体验更便捷的校园生活！https://nongyu.app',
+                      message: '为川农er打造的专属校园助手app，课表、教务、二课一网打尽！\nhttps://nongyu-app.github.io/index.html',
                       title: '分享农屿',
                     });
                   }
@@ -149,20 +148,21 @@ const ShareSheet: React.FC<ShareSheetProps> = ({ visible, onDismiss, screenshotU
         }
 
         try {
+          const thumbImage = await buildShareThumb();
           if (platform === 'wechat') {
             await WeChat.shareWebpage({
-              title: '农屿 - 川农学子的贴心助手',
-              description: '课表成绩一键查，考试安排早知道。让校园生活更简单，点击立即体验！',
-              thumbImage: 'https://nongyu.app/logo.png',
-              webpageUrl: 'https://nongyu.app',
+              title: '农屿 - 专属川农er的校园助手',
+              description: '在农屿，无广告课表、便捷教务信息查询、i川农二课接入，你想要的，农屿都能做到！',
+              thumbImage,
+              webpageUrl: 'https://nongyu-app.github.io/index.html',
               scene: 0, // 0: Session, 1: Timeline, 2: Favorite
             });
           } else {
             await WeChat.shareWebpage({
-              title: '农屿 - 川农学子的贴心助手',
-              description: '课表成绩一键查，考试安排早知道。让校园生活更简单，点击立即体验！',
-              thumbImage: 'https://nongyu.app/logo.png',
-              webpageUrl: 'https://nongyu.app',
+              title: '农屿 - 专属川农er的校园助手',
+              description: '在农屿，无广告课表、便捷教务信息查询、i川农二课接入，你想要的，农屿都能做到！',
+              thumbImage,
+              webpageUrl: 'https://nongyu-app.github.io/index.html',
               scene: 1, // Timeline
             });
           }
@@ -172,14 +172,14 @@ const ShareSheet: React.FC<ShareSheetProps> = ({ visible, onDismiss, screenshotU
       } else if (platform === 'system') {
         try {
           await Share.share({
-            message: '农屿 - 川农学子的贴心助手\n课表成绩一键查，考试安排早知道。让校园生活更简单，点击立即体验！\nhttps://nongyu.app',
+            message: '为川农er打造的专属校园助手app\nhttps://nongyu-app.github.io/index.html',
             title: '分享农屿',
           });
         } catch (error: any) {
           showToast(error.message);
         }
       } else if (platform === 'copy') {
-        await Clipboard.setStringAsync('https://nongyu.app');
+        await Clipboard.setStringAsync('https://nongyu-app.github.io/index.html');
         showToast('链接已复制');
       }
     } catch (error) {
@@ -192,6 +192,12 @@ const ShareSheet: React.FC<ShareSheetProps> = ({ visible, onDismiss, screenshotU
   };
 
   const handleGeneratePoster = () => {
+    analytics.trackClick('share_action', 'ShareSheet', {
+      element_name: '生成海报',
+      page_name: 'ShareSheet',
+      platform: 'poster'
+    });
+
     // Close the sheet first
     onDismiss();
     

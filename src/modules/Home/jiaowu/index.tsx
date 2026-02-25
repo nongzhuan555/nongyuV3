@@ -9,6 +9,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { fetchCourseSchedule } from '@/jiaowu/course/schedule';
 import { normalizeCourses, COURSE_TIMES } from '@/utils/courseParser';
 import { addEventToCalendar } from '@/utils/calendar';
+import analytics from '@/sdk/analytics';
 
 // 教务入口配置
 const SERVICES = [
@@ -63,16 +64,6 @@ const SERVICES = [
     bgColor: '#FFF3E0'
   },
   { 
-    key: 'course', 
-    label: '课表导入', 
-    sub: '一键导入课程表到日历',
-    page: 'course', 
-    disabled: false,
-    icon: 'calendar-import',
-    color: '#9E9E9E',
-    bgColor: '#F5F5F5'
-  },
-  { 
     key: 'exam', 
     label: '考试安排', 
     sub: '期末考试时间地点查询',
@@ -97,6 +88,11 @@ const JiaowuHome = observer(() => {
   const handlePress = (item: typeof SERVICES[number]) => {
     if (item.disabled) return;
     
+    analytics.trackClick(item.key, 'JiaowuHome', {
+      element_name: item.label,
+      page_name: 'JiaowuHome',
+    });
+
     // 如果未登录且不是教务通知或竞赛通知，提示登录（虽然 UI 上已经显示锁定，但防止误触）
     if (!logged && item.key !== 'notice' && item.key !== 'competition') {
       return;
@@ -114,7 +110,11 @@ const JiaowuHome = observer(() => {
   };
 
   const handleImportConfirm = async () => {
-      const currentWeek = parseInt(currentWeekInput);
+    analytics.trackClick('confirm_import_course', 'JiaowuHome', {
+      element_name: '确认导入课表',
+      page_name: 'JiaowuHome',
+    });
+    const currentWeek = parseInt(currentWeekInput);
       if (isNaN(currentWeek) || currentWeek < 1 || currentWeek > 25) {
         Alert.alert('错误', '请输入有效的周次（1-25）');
         return;

@@ -1,8 +1,7 @@
-import dev from './env.dev';
 import prod from './env.prod';
 
-export type EnvConfig = typeof dev;
+export type EnvConfig = typeof prod;
 
-export const env: EnvConfig = __DEV__ ? dev : prod;
+export const env: EnvConfig = prod;
 
 export default env;

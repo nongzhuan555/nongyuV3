@@ -45,24 +45,37 @@ export default function TodoList(props: Props & { embedded?: boolean; style?: an
   };
   const [items, setItems] = useState<Todo[]>([]);
   const [loaded, setLoaded] = useState(false);
-  const storageKey = `TODO_LIST_${courseId}`;
+  // 如果 courseId 变化，重置 loaded 状态，防止旧数据污染或竞态条件
+  // const storageKey = `TODO_LIST_${courseId}`; 
+
+  // 使用 useMemo 确保 key 稳定
+  const storageKey = useMemo(() => `TODO_LIST_${courseId}`, [courseId]);
 
   useEffect(() => {
+    let isActive = true;
     (async () => {
+      // 切换课程时，先重置状态，避免显示上一个课程的数据
+      setLoaded(false);
+      setItems([]); 
+      
       try {
         const json = await AsyncStorage.getItem(storageKey);
-        if (json) {
+        if (isActive && json) {
           setItems(JSON.parse(json));
         }
       } catch (e) {
         // ignore
       } finally {
-        setLoaded(true);
+        if (isActive) {
+          setLoaded(true);
+        }
       }
     })();
+    return () => { isActive = false; };
   }, [storageKey]);
 
   useEffect(() => {
+    // 只有当 loaded 为 true 且 storageKey 对应当前课程时才保存
     if (loaded) {
       AsyncStorage.setItem(storageKey, JSON.stringify(items)).catch(() => {});
     }

@@ -1,16 +1,22 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Dimensions, ScrollView, StyleSheet, TouchableOpacity, View, Animated, Easing, Pressable, Platform, BackHandler, FlatList } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Button, Text, useTheme, TextInput, Chip, MD3Theme, Snackbar, ActivityIndicator } from 'react-native-paper';
+import { Button, Text, useTheme, TextInput, Chip, MD3Theme, Snackbar, ActivityIndicator, Portal } from 'react-native-paper';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import courseData from '@/jiaowu/course/course.json';
 import { fetchCourseSchedule, CourseScheduleData } from '@/jiaowu/course/schedule';
+import { ExamItem, cleanExamHtml } from '@/jiaowu/jiaowuInfo/examInfo';
+import { fetchAndCleanWithRetry } from '@/jiaowu/utils/retry';
 import CourseDetailModal from './CourseDetailModal';
 import ExamSchedule from '../ExamSchedule';
 import { CourseEntry, AttendanceRecord, WeekRange } from './types';
 import { profileStore } from '@/stores/profile';
 import { observer } from 'mobx-react-lite';
+import { updateWidgetData, writeWidgetSchedule } from '@/utils/widget';
+import TopToast from '@/shared/components/TopToast';
+import { computeCurrentWeek as computeCurrentWeekUtil, getMondayOfWeek } from '@/utils/semesterDate';
+import analytics from '@/sdk/analytics';
 
 type GridRow = string[];
 type TimeEntry = { day: number; start: number; end: number; odd: boolean; even: boolean };
@@ -173,44 +179,10 @@ function weekMatches(week: number, info: CourseEntry) {
   return true;
 }
 
-function computeCurrentWeek() {
-  const now = new Date();
-  const first = new Date(now.getFullYear(), now.getMonth(), 1);
-  const day = first.getDay() === 0 ? 7 : first.getDay();
-  const offset = 1 - day;
-  const monday = new Date(first.getFullYear(), first.getMonth(), first.getDate() + offset);
-  const diff = now.getTime() - monday.getTime();
-  const w = Math.floor(diff / (7 * 24 * 3600 * 1000)) + 1;
-  return Math.max(1, w);
-}
-
-function anchorMonday() {
-  const now = new Date();
-  const first = new Date(now.getFullYear(), now.getMonth(), 1);
-  const day = first.getDay() === 0 ? 7 : first.getDay();
-  const offset = 1 - day;
-  return new Date(first.getFullYear(), first.getMonth(), first.getDate() + offset);
-}
-
-function mondayOfWeek(week: number) {
-  const base = anchorMonday();
-  return new Date(base.getTime() + (week - 1) * 7 * 24 * 3600 * 1000);
-}
-
 function formatMD(d: Date) {
   const m = d.getMonth() + 1;
   const day = d.getDate();
   return `${m}/${day}`;
-}
-
-function getWeekDates(week: number) {
-  const mon = mondayOfWeek(week);
-  const arr: string[] = [];
-  for (let i = 0; i < 7; i++) {
-    const d = new Date(mon.getFullYear(), mon.getMonth(), mon.getDate() + i);
-    arr.push(formatMD(d));
-  }
-  return arr;
 }
 
 function isSameDay(a: Date, b: Date) {
@@ -252,6 +224,7 @@ const WeekSlide = React.memo(({
   onCellPress,
   onModalOpen,
   onGoThisWeek,
+  startDate,
 }: {
   weekIndex: number;
   grid: Array<Array<CourseEntry[]>>;
@@ -265,13 +238,25 @@ const WeekSlide = React.memo(({
   onCellPress: (week: number, c: number, r: number) => void;
   onModalOpen: (course: CourseEntry) => void;
   onGoThisWeek: () => void;
+  startDate: Date | null;
 }) => {
   const [hoverThisWeek, setHoverThisWeek] = useState(false);
-  const dates = useMemo(() => getWeekDates(weekIndex + 1), [weekIndex]);
-  const mon = useMemo(() => mondayOfWeek(weekIndex + 1), [weekIndex]);
+  const mon = useMemo(() => startDate ? getMondayOfWeek(weekIndex + 1, startDate) : new Date(), [weekIndex, startDate]);
+  
+  const dates = useMemo(() => {
+    const arr: string[] = [];
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(mon.getFullYear(), mon.getMonth(), mon.getDate() + i);
+      arr.push(formatMD(d));
+    }
+    return arr;
+  }, [mon]);
+
   const today = useMemo(() => new Date(), []);
 
   const isCurrentWeek = weekIndex === curWeekIndex;
+
+  if (!grid) return null;
 
   return (
     <View style={{ width }}>
@@ -397,18 +382,53 @@ const WeekSlide = React.memo(({
   );
 });
 
-function CourseTable({ onTitleChange }: { onTitleChange?: (title: string) => void }) {
+import { SemesterEndState } from '../SemesterEndState';
+
+const EXAM_STORAGE_KEY = 'app:exam:cache';
+
+// 计算当前学期状态
+const getSemesterStatus = (startDate: Date | null, maxWeek: number, exams: ExamItem[]) => {
+  if (!startDate) return { isEnded: false };
+  
+  // 1. 检查是否超过最大周次
+  const currentWeek = computeCurrentWeekUtil(startDate);
+  if (currentWeek <= maxWeek) return { isEnded: false };
+
+  // 2. 检查所有考试是否已结束
+  const now = new Date();
+  now.setHours(0, 0, 0, 0);
+  
+  const hasPendingExams = exams.some(exam => {
+    if (!exam.examTime) return false;
+    const match = exam.examTime.match(/(\d{4})[-/年](\d{1,2})[-/月](\d{1,2})/);
+    if (!match) return false;
+    const examDate = new Date(parseInt(match[1]), parseInt(match[2]) - 1, parseInt(match[3]));
+    return examDate >= now;
+  });
+
+  return { isEnded: !hasPendingExams };
+};
+
+function CourseTable({ onTitleChange, startDate }: { onTitleChange?: (title: string) => void; startDate: Date | null }) {
   const theme = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
   const insets = useSafeAreaInsets();
   
   const [scheduleData, setScheduleData] = useState<CourseScheduleData>(courseData as any);
+  const [exams, setExams] = useState<ExamItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [containerHeight, setContainerHeight] = useState(0);
+  const startTime = useRef(Date.now());
+  
+  // Custom courses state - moved here to avoid ReferenceError
+  const [customs, setCustoms] = useState<CourseEntry[]>([]);
+  const [customsLoaded, setCustomsLoaded] = useState(false);
 
   const COURSE_STORAGE_KEY = 'JIAOWU_COURSE_DATA';
   const CUSTOM_COURSE_STORAGE_KEY = 'JIAOWU_CUSTOM_COURSE_DATA';
+  const EXAM_STORAGE_KEY = 'app:exam:cache';
 
   const fetchSchedule = useCallback(async () => {
     setLoading(true);
@@ -428,6 +448,35 @@ function CourseTable({ onTitleChange }: { onTitleChange?: (title: string) => voi
           setScheduleData(null);
         }
       }
+      
+      // Load exams from cache
+      const examData = await AsyncStorage.getItem(EXAM_STORAGE_KEY);
+      if (examData) {
+        try {
+          const parsed = JSON.parse(examData);
+          if (parsed && Array.isArray(parsed.list)) {
+            setExams(parsed.list);
+          }
+        } catch (e) {
+          // ignore
+        }
+      }
+
+      // Fetch exams from network
+      if (profileStore.profile.studentId) {
+        fetchAndCleanWithRetry(
+          'https://jiaowu.sicau.edu.cn/xuesheng/kao/kao/xuesheng.asp?title_id1=01',
+          (html) => cleanExamHtml(html),
+          (data) => !data.list || data.list.length === 0,
+          '考试安排'
+        ).then(data => {
+          if (data && Array.isArray(data.list)) {
+            setExams(data.list);
+            AsyncStorage.setItem(EXAM_STORAGE_KEY, JSON.stringify(data));
+          }
+        }).catch(e => console.warn('Background exam fetch failed', e));
+      }
+      
     } catch (err) {
       console.warn('Failed to fetch course schedule:', err);
       setErrorMsg('获取课表数据失败');
@@ -443,6 +492,7 @@ function CourseTable({ onTitleChange }: { onTitleChange?: (title: string) => voi
     if (!profile.studentId) {
       setScheduleData(null);
       setCustoms([]);
+      setCustomsLoaded(false);
     } else {
       // 有学号，说明是登录状态，执行数据加载
       fetchSchedule();
@@ -456,39 +506,68 @@ function CourseTable({ onTitleChange }: { onTitleChange?: (title: string) => voi
         } else {
           setCustoms([]);
         }
+        setCustomsLoaded(true);
+      }).catch(() => {
+        setCustomsLoaded(true);
       });
     }
-  }, [profile.studentId, fetchSchedule]);
+  }, [profile.studentId]); // 移除了 fetchSchedule 依赖，因为它应该是稳定的，且只在 studentId 变化时执行
 
   // 保存自定义课程数据
   useEffect(() => {
-    if (customs.length > 0) {
-      AsyncStorage.setItem(CUSTOM_COURSE_STORAGE_KEY, JSON.stringify(customs));
-    }
-  }, [customs]);
+    const saveCustoms = async () => {
+      // 只有当用户已登录且数据已加载完成时才持久化自定义课程
+      // 防止初始空数据覆盖本地存储
+      if (profile.studentId && customsLoaded) {
+         try {
+           await AsyncStorage.setItem(CUSTOM_COURSE_STORAGE_KEY, JSON.stringify(customs));
+         } catch (e) {
+           console.error('Failed to save custom courses', e);
+         }
+      }
+    };
+    saveCustoms();
+  }, [customs, profile.studentId, customsLoaded]);
 
   const grid = (scheduleData?.grid || []) as GridRow[];
 
   const { courses, maxWeek } = useMemo(() => normalizeCourses(grid), [grid]);
-  const [customs, setCustoms] = useState<CourseEntry[]>([]);
+  // customs moved to top
   const allCourses = useMemo(() => [...courses, ...customs], [courses, customs]);
   const weeks = useMemo(() => buildWeekMatrix(maxWeek, allCourses, isSuppressed), [maxWeek, allCourses]);
   const width = Dimensions.get('window').width;
   const height = Dimensions.get('window').height;
   const flatListRef = useRef<FlatList>(null);
-  const initialWeek = Math.min(maxWeek, Math.max(1, computeCurrentWeek()));
+  const initialWeek = Math.min(maxWeek, Math.max(1, startDate ? computeCurrentWeekUtil(startDate) : 1));
   const [active, setActive] = useState(initialWeek - 1);
+
+  // Update widget when courses change
+  useEffect(() => {
+    if (allCourses.length > 0) {
+      updateWidgetData(allCourses, initialWeek, exams);
+      writeWidgetSchedule(allCourses, startDate || undefined);
+      
+      // Track performance
+      const duration = Date.now() - startTime.current;
+      analytics.track('client_performance', {
+        page_name: 'CourseTable',
+        duration_ms: duration,
+      }, 'CourseTable', undefined, duration);
+    }
+  }, [allCourses, initialWeek, exams]);
 
   // Sync title with parent
   useEffect(() => {
     if (onTitleChange) {
-      if (active === maxWeek) {
+      if (active === maxWeek + 1 && isEnded) {
+        onTitleChange('学期结束');
+      } else if (active === maxWeek) {
         onTitleChange('考试安排（正考）');
       } else {
-        onTitleChange('课程表');
+        onTitleChange('农屿课程表');
       }
     }
-  }, [active, maxWeek, onTitleChange]);
+  }, [active, maxWeek, onTitleChange, isEnded]);
 
   const [selected, setSelected] = useState<CourseEntry | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
@@ -518,8 +597,26 @@ function CourseTable({ onTitleChange }: { onTitleChange?: (title: string) => voi
     }, 0);
   }, [width]);
 
+  useEffect(() => {
+    if (startDate) {
+        const w = Math.min(maxWeek, Math.max(1, computeCurrentWeekUtil(startDate)));
+        // 如果学期已结束，定位到结束页
+        if (isEnded && w > maxWeek) {
+            setActive(maxWeek + 1);
+            setTimeout(() => {
+                flatListRef.current?.scrollToIndex({ index: maxWeek + 1, animated: true });
+            }, 100);
+        } else {
+            setActive(w - 1);
+            setTimeout(() => {
+               flatListRef.current?.scrollToIndex({ index: w - 1, animated: true });
+            }, 100);
+        }
+    }
+  }, [startDate, maxWeek, isEnded]);
+
   const goThisWeek = () => {
-    const w = Math.min(maxWeek, Math.max(1, computeCurrentWeek())) - 1;
+    const w = Math.min(maxWeek, Math.max(1, startDate ? computeCurrentWeekUtil(startDate) : 1)) - 1;
     setActive(w);
     flatListRef.current?.scrollToIndex({ index: w, animated: true });
   };
@@ -541,6 +638,42 @@ function CourseTable({ onTitleChange }: { onTitleChange?: (title: string) => voi
 
   // 考勤数据 state: { [courseName]: { present: 0, late: 0, absent: 0 } }
   const [attendanceData, setAttendanceData] = useState<Record<string, AttendanceRecord>>({});
+  const [attendanceLoaded, setAttendanceLoaded] = useState(false);
+
+  // 加载考勤数据
+  useEffect(() => {
+    if (!profile.studentId) {
+      setAttendanceData({});
+      setAttendanceLoaded(false);
+    } else {
+      AsyncStorage.getItem('JIAOWU_ATTENDANCE_DATA').then(json => {
+        if (json) {
+          try {
+            setAttendanceData(JSON.parse(json));
+          } catch (e) {
+            console.error('Failed to parse attendance data', e);
+          }
+        }
+        setAttendanceLoaded(true);
+      }).catch(() => {
+        setAttendanceLoaded(true);
+      });
+    }
+  }, [profile.studentId]);
+
+  // 保存考勤数据
+  useEffect(() => {
+    const saveAttendance = async () => {
+      if (profile.studentId && attendanceLoaded) {
+        try {
+          await AsyncStorage.setItem('JIAOWU_ATTENDANCE_DATA', JSON.stringify(attendanceData));
+        } catch (e) {
+          console.error('Failed to save attendance data', e);
+        }
+      }
+    };
+    saveAttendance();
+  }, [attendanceData, profile.studentId, attendanceLoaded]);
 
   const handleUpdateAttendance = (type: keyof AttendanceRecord, delta: number) => {
     if (!selected) return;
@@ -604,6 +737,7 @@ function CourseTable({ onTitleChange }: { onTitleChange?: (title: string) => voi
 
   const openConfirm = useCallback(() => {
     if (deleteWeeks.length === 0) return;
+    closeModal();
     setConfirmVisible(true);
     confirmFade.setValue(0);
     confirmScale.setValue(0.96);
@@ -611,7 +745,7 @@ function CourseTable({ onTitleChange }: { onTitleChange?: (title: string) => voi
       Animated.timing(confirmFade, { toValue: 1, duration: 140, easing: Easing.out(Easing.quad), useNativeDriver: true }),
       Animated.timing(confirmScale, { toValue: 1, duration: 140, easing: Easing.out(Easing.quad), useNativeDriver: true }),
     ]).start();
-  }, [deleteWeeks.length]);
+  }, [deleteWeeks.length, closeModal]);
 
   const closeConfirm = useCallback(() => {
     Animated.parallel([
@@ -669,6 +803,7 @@ function CourseTable({ onTitleChange }: { onTitleChange?: (title: string) => voi
       isCustom: addType === 'schedule',
     };
     setCustoms((prev) => [...prev, newItem]);
+    setSuccessMsg('添加成功');
     closeAdd();
   };
 
@@ -749,18 +884,35 @@ function CourseTable({ onTitleChange }: { onTitleChange?: (title: string) => voi
       });
     }
     setDeleteWeeks([]);
+    setSuccessMsg('删除成功');
     closeModal();
   };
 
-  const curWeekIndex = Math.min(maxWeek, Math.max(1, computeCurrentWeek())) - 1;
+  const curWeekIndex = Math.min(maxWeek, Math.max(1, startDate ? computeCurrentWeekUtil(startDate) : 1)) - 1;
+
+  const { isEnded } = useMemo(() => getSemesterStatus(startDate, maxWeek, exams), [startDate, maxWeek, exams]);
+
+  // 当学期结束时，让 FlatList 渲染 maxWeek + 2 项，最后一项用于展示 SemesterEndState
+  const dataLength = isEnded ? maxWeek + 2 : maxWeek + 1;
 
   const renderItem = useCallback(({ item, index }: { item: any, index: number }) => {
     const pageHeight = containerHeight > 0 ? containerHeight : Math.max(400, height - 24 - insets.top);
+
+    if (isEnded && index === maxWeek + 1) {
+       return (
+          <View style={{ width, height: pageHeight }}>
+             <SemesterEndState onLookBack={() => {
+                flatListRef.current?.scrollToIndex({ index: 0, animated: true });
+                setActive(0);
+             }} />
+          </View>
+       );
+    }
     
     if (index === maxWeek) {
        return (
          <View style={{ width, height: pageHeight }}>
-            <ExamSchedule />
+            <ExamSchedule exams={exams} />
          </View>
        );
     }
@@ -779,15 +931,16 @@ function CourseTable({ onTitleChange }: { onTitleChange?: (title: string) => voi
         onCellPress={handleEmptyCellPress}
         onModalOpen={openModal}
         onGoThisWeek={goThisWeek}
+        startDate={startDate}
       />
     );
-  }, [weeks, maxWeek, curWeekIndex, width, height, insets, theme, styles, armedCell, handleEmptyCellPress, openModal, goThisWeek, containerHeight]);
+  }, [weeks, maxWeek, curWeekIndex, width, height, insets, theme, styles, armedCell, handleEmptyCellPress, openModal, goThisWeek, containerHeight, startDate]);
 
   return (
     <View style={styles.wrap} onLayout={(e) => setContainerHeight(e.nativeEvent.layout.height)}>
       <FlatList
         ref={flatListRef}
-        data={Array.from({ length: maxWeek + 1 })}
+        data={Array.from({ length: dataLength })}
         renderItem={renderItem}
         horizontal
         pagingEnabled
@@ -931,18 +1084,27 @@ function CourseTable({ onTitleChange }: { onTitleChange?: (title: string) => voi
         </View>
       ) : null}
 
-      {/* 错误提示 Snackbar */}
-      <Snackbar
-        visible={!!errorMsg}
-        onDismiss={() => setErrorMsg(null)}
-        duration={3000}
-        action={{
-          label: '重试',
-          onPress: fetchSchedule,
-        }}
-      >
-        {errorMsg}
-      </Snackbar>
+      {/* 成功提示 TopToast */}
+      <Portal>
+        <TopToast
+          visible={!!successMsg}
+          message={successMsg}
+          type="success"
+          onDismiss={() => setSuccessMsg(null)}
+        />
+
+        <TopToast
+          visible={!!errorMsg}
+          message={errorMsg}
+          type="error"
+          onDismiss={() => setErrorMsg(null)}
+          duration={3000}
+          action={{
+            label: '重试',
+            onPress: fetchSchedule
+          }}
+        />
+      </Portal>
 
       {/* 加载中指示器 */}
       {loading && (

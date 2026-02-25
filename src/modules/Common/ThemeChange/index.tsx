@@ -4,6 +4,7 @@ import { Text, useTheme } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { observer } from 'mobx-react-lite';
 import { themeStore } from '@/theme';
+import analytics from '@/sdk/analytics';
 
 const COLORS = [
   { key: 'green', color: '#0A7C59', name: '川农新绿' },
@@ -19,7 +20,12 @@ const MODES = [
 const ThemeChange = observer(() => {
   const theme = useTheme();
 
-  const handleModeChange = async (mode: 'light' | 'dark' | 'system') => {
+  const handleModeChange = async (mode: any) => {
+    analytics.trackClick('theme_mode_change', 'ProfileSetting', {
+      element_name: `切换模式:${mode}`,
+      page_name: 'ProfileSetting',
+      new_mode: mode
+    });
     await themeStore.setMode(mode);
     if (mode === 'dark') {
        // 保持原有逻辑，切到 dark 时强制 green
@@ -27,7 +33,12 @@ const ThemeChange = observer(() => {
     }
   };
 
-  const handleColorChange = async (color: 'green' | 'sakura') => {
+  const handleColorChange = async (color: any) => {
+    analytics.trackClick('theme_color_change', 'ProfileSetting', {
+      element_name: `切换颜色:${color}`,
+      page_name: 'ProfileSetting',
+      new_color: color
+    });
     await themeStore.setBrand(color);
     if (themeStore.isDark) {
       // 保持原有逻辑，切颜色时切回 light
@@ -109,6 +120,7 @@ const styles = StyleSheet.create({
   },
   section: {
     marginBottom: 24,
+    padding:10,
   },
   sectionTitle: {
     fontSize: 13,

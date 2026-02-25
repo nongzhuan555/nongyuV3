@@ -10,6 +10,7 @@ import TopTab from '@/shared/components/TopTab';
 import Greeting from './components/Greeting';
 import NoticeBar from './components/NoticeBar';
 import WebNav from './components/WebNav';
+import analytics from '@/sdk/analytics';
 
 export default function Home() {
   const navigation = useNavigation();
@@ -24,6 +25,11 @@ export default function Home() {
     await Clipboard.setStringAsync(value);
     setMsgText(`${label}已复制`);
     setMsgVisible(true);
+    analytics.trackClick('copy_button', 'Home', {
+      element_name: `复制${label}`,
+      page_name: 'Home',
+      value: value
+    });
   };
 
   return (

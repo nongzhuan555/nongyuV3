@@ -105,15 +105,6 @@ const ExamCard = ({ exam, theme, compact = false }: { exam: ExamItem, theme: any
           <Text style={[styles.courseName, { color: textColor, fontSize: compact ? 13 : 14 }]}>
             {exam.courseName}
           </Text>
-          {!isPassed && (
-             <IconButton 
-               icon="calendar-plus" 
-               size={16} 
-               iconColor={theme.colors.primary}
-               onPress={handleAddToCalendar}
-               style={{ margin: 0, width: 18, height: 18 }}
-             />
-          )}
         </View>
 
         {daysLeft !== null && !isPassed ? (
@@ -224,7 +215,7 @@ const ExamSummary = ({ exams, theme }: { exams: ExamItem[], theme: any }) => {
   );
 };
 
-const ExamSchedule = observer(() => {
+const ExamSchedule = observer(({ exams: propExams }: { exams?: ExamItem[] }) => {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
   
@@ -260,7 +251,7 @@ const ExamSchedule = observer(() => {
   
   const isLoading = swrLoading || checkingStorage;
 
-  const examList = (data?.list || []) as ExamItem[];
+  const examList = propExams || (data?.list || []) as ExamItem[];
   
   // 排序：未考的在前（按时间正序），已考的在后（按时间倒序）
   const sortedExams = useMemo(() => {
@@ -348,7 +339,7 @@ const ExamSchedule = observer(() => {
             <View style={styles.emptyContainer}>
                <MaterialCommunityIcons name="calendar-check-outline" size={60} color={theme.colors.surfaceVariant} />
                <Text style={{ textAlign: 'center', marginTop: 16, color: theme.colors.outline }}>
-                 暂无考试安排
+                 本学期考试安排暂未发布
                </Text>
                <Button mode="text" onPress={() => mutate()} style={{ marginTop: 10 }}>刷新试试</Button>
             </View>

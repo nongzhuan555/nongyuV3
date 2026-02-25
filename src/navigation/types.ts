@@ -18,7 +18,8 @@ export type RootStackParamList = {
   SecondActivityList: undefined;
   SecondActivityDetail: { id: string };
   SecondUserInfo: undefined;
-  NoticeDetail: { content?: string } | undefined;
+  NoticeDetail: { content?: string; title?: string; created_at?: string; type?: number } | undefined;
+  NoticeList: undefined;
   JiaowuNotice: undefined;
   WebViewScreen: { url: string; title?: string };
   ProfileSetting: undefined;

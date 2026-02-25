@@ -18,8 +18,8 @@ type WeatherApiResponse = {
 };
 
 const CAMPUS_COORDS: Record<CampusKey, { lat: number; lon: number }> = {
-  雅安校区: { lat: 29.98, lon: 103.00 },
-  成都校区: { lat: 30.67, lon: 104.07 },
+  雅安校区: { lat: 29.98, lon: 102.99 },
+  成都校区: { lat: 30.71, lon: 103.87 },
   都江堰校区: { lat: 31.00, lon: 103.62 },
 };
 

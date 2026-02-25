@@ -1,10 +1,11 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { StyleSheet, View, Pressable } from 'react-native';
 import { Text, useTheme } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '@/navigation/types';
+import { getLatestNotification, Notification } from './api';
 
 type NoticeBarProps = {
   content?: string | null;
@@ -12,10 +13,42 @@ type NoticeBarProps = {
 
 export const DEFAULT_NOTICE = '欢迎使用农屿，这是农屿的官方通知栏~';
 
+const getTypeLabel = (type: number) => {
+  switch (type) {
+    case 1: return '系统更新';
+    case 2: return '系统维护';
+    case 3: return '安全通知';
+    case 4: return '日常通知';
+    default: return '通知';
+  }
+};
+
 export default function NoticeBar({ content }: NoticeBarProps) {
   const theme = useTheme();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
-  const text = content?.trim() ? content.trim() : DEFAULT_NOTICE;
+  const [notification, setNotification] = useState<Notification | null>(null);
+
+  useEffect(() => {
+    if (!content) {
+      getLatestNotification().then(setNotification);
+    }
+  }, [content]);
+
+  const displayContent = React.useMemo(() => {
+    if (content?.trim()) return content.trim();
+    if (notification) {
+      return `【${getTypeLabel(notification.type)}】${notification.title}`;
+    }
+    return DEFAULT_NOTICE;
+  }, [content, notification]);
+
+  const handlePress = () => {
+    if (content?.trim()) {
+      navigation.navigate('NoticeDetail', { content: content.trim() });
+    } else {
+      navigation.navigate('NoticeList');
+    }
+  };
 
   return (
     <Pressable
@@ -28,13 +61,13 @@ export default function NoticeBar({ content }: NoticeBarProps) {
         },
         pressed ? styles['notice__wrapPressed'] : null,
       ]}
-      onPress={() => navigation.navigate('NoticeDetail', { content: text })}
+      onPress={handlePress}
     >
       <View style={[styles['notice__badge'], { backgroundColor: theme.colors.primary }]}>
         <MaterialCommunityIcons name="bullhorn" size={14} color={theme.colors.onPrimary} />
       </View>
       <Text style={[styles['notice__text'], { color: theme.colors.onSurface }]} numberOfLines={1} ellipsizeMode="tail">
-        {text}
+        {displayContent}
       </Text>
     </Pressable>
   );

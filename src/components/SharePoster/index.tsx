@@ -1,11 +1,10 @@
-import React, { useRef, useState } from 'react';
-import { View, StyleSheet, Modal, TouchableOpacity, Platform, Alert, Dimensions, ScrollView, Image } from 'react-native';
-import { Text, Button, IconButton, useTheme, Surface, ActivityIndicator, Avatar } from 'react-native-paper';
+import React, { useRef, useState, useEffect } from 'react';
+import { View, StyleSheet, Modal, TouchableOpacity, Alert, Dimensions, ScrollView, Image, SafeAreaView, Pressable, StatusBar, Platform } from 'react-native';
+import { Text, Button, useTheme, Surface, Avatar } from 'react-native-paper';
 import ViewShot from 'react-native-view-shot';
 import * as MediaLibrary from 'expo-media-library';
 import * as Sharing from 'expo-sharing';
 import QRCode from 'react-native-qrcode-svg';
-import { LinearGradient } from 'expo-linear-gradient';
 import { profileStore } from '@/stores/profile';
 import { observer } from 'mobx-react-lite';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -16,16 +15,15 @@ interface SharePosterProps {
   screenshotUri?: string | null;
 }
 
-const { width } = Dimensions.get('window');
-const POSTER_WIDTH = width * 0.85;
+const { width, height } = Dimensions.get('window');
+const POSTER_WIDTH = width * 0.88;
 
 // --- 海报配置区域 ---
 const POSTER_CONFIG = {
   appName: '农屿 NongYu',
-  slogan: '川农学子的贴心助手',
-  inviteText: '让校园生活更简单',
-  qrCodeUrl: 'https://nongyu.app', // 二维码跳转链接
-  scanHint: '长按识别二维码 / 扫码进入农屿官网下载',
+  slogan: '让校园生活更简单',
+  qrCodeUrl: 'https://nongyu-app.github.io/index.html',
+  scanHint: '长按识别二维码',
 };
 // --------------------
 
@@ -33,10 +31,31 @@ const SharePoster: React.FC<SharePosterProps> = observer(({ visible, onDismiss, 
   const theme = useTheme();
   const viewShotRef = useRef<ViewShot>(null);
   const [processing, setProcessing] = useState(false);
+  const [imageSize, setImageSize] = useState({ width: 0, height: 0 });
 
   const profile = profileStore.profile;
   const userName = profile.name || '农屿用户';
   const userAvatarText = (userName?.[0] || 'N').toUpperCase();
+  const currentDate = new Date().toLocaleDateString();
+
+  useEffect(() => {
+    if (screenshotUri) {
+      Image.getSize(screenshotUri, (w, h) => {
+        // Calculate aspect ratio
+        const aspectRatio = h / w;
+        // Calculate display height based on poster width (minus padding)
+        const contentWidth = POSTER_WIDTH - 48; // 24 * 2 padding
+        const calculatedHeight = contentWidth * aspectRatio;
+        
+        setImageSize({ 
+          width: contentWidth, 
+          height: calculatedHeight 
+        });
+      }, (error) => {
+        console.error('Failed to get image size', error);
+      });
+    }
+  }, [screenshotUri]);
 
   // 生成并保存海报
   const handleSave = async () => {
@@ -44,7 +63,6 @@ const SharePoster: React.FC<SharePosterProps> = observer(({ visible, onDismiss, 
     setProcessing(true);
 
     try {
-      // 1. 请求权限
       const { status } = await MediaLibrary.requestPermissionsAsync();
       if (status !== 'granted') {
         Alert.alert('权限不足', '需要访问相册权限以保存海报');
@@ -52,11 +70,10 @@ const SharePoster: React.FC<SharePosterProps> = observer(({ visible, onDismiss, 
         return;
       }
 
-      // 2. 截图
+      // Capture with better quality
       const uri = await viewShotRef.current?.capture?.();
       if (!uri) throw new Error('生成海报失败');
 
-      // 3. 保存
       await MediaLibrary.saveToLibraryAsync(uri);
       Alert.alert('保存成功', '海报已保存到相册', [{ text: '好的', onPress: onDismiss }]);
     } catch (error: any) {
@@ -72,18 +89,15 @@ const SharePoster: React.FC<SharePosterProps> = observer(({ visible, onDismiss, 
     setProcessing(true);
 
     try {
-      // 1. 截图
       const uri = await viewShotRef.current?.capture?.();
       if (!uri) throw new Error('生成海报失败');
 
-      // 2. 检查分享是否可用
       if (!(await Sharing.isAvailableAsync())) {
         Alert.alert('分享不可用', '当前设备不支持直接分享文件');
         setProcessing(false);
         return;
       }
 
-      // 3. 分享
       await Sharing.shareAsync(uri);
     } catch (error: any) {
       Alert.alert('分享失败', error.message || '未知错误');
@@ -98,121 +112,131 @@ const SharePoster: React.FC<SharePosterProps> = observer(({ visible, onDismiss, 
       transparent
       animationType="fade"
       onRequestClose={onDismiss}
+      statusBarTranslucent
     >
-      <View style={styles.container}>
-        <View style={styles.backdrop} />
+      <View style={styles.modalContainer}>
+        {/* 背景遮罩 - 使用绝对定位填满全屏 */}
+        <Pressable 
+          style={styles.backdrop} 
+          onPress={onDismiss}
+        />
         
-        <View style={styles.content}>
+        {/* 滚动容器层 - 覆盖在遮罩之上 */}
+        <View style={styles.scrollWrapper} pointerEvents="box-none">
           <ScrollView 
+            style={styles.scrollView}
             contentContainerStyle={styles.scrollContent}
-            showsVerticalScrollIndicator={false}
+            showsVerticalScrollIndicator={true}
+            bounces={true}
+            // 确保点击ScrollView的空白区域也会关闭Modal（如果在内容之外）
+            // 但ScrollView通常会拦截触摸。
+            // 可以在这里加一个Pressable包裹内容来拦截冒泡
           >
-            <ViewShot 
-              ref={viewShotRef} 
-              options={{ format: 'png', quality: 1.0 }}
-              style={[styles.posterContainer, { backgroundColor: theme.colors.surface }]}
-            >
-              {/* 顶部装饰 */}
-              <LinearGradient
-                colors={['#4facfe', '#00f2fe']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={styles.headerDecoration}
-              />
-
-              <View style={styles.posterBody}>
-                {/* 用户信息 */}
-                <View style={styles.userInfo}>
-                  <Avatar.Text 
-                    size={50} 
-                    label={userAvatarText} 
-                    style={{ backgroundColor: theme.colors.primaryContainer }}
-                    color={theme.colors.onPrimaryContainer}
-                  />
-                  <View style={styles.userMeta}>
-                    <Text style={[styles.userName, { color: theme.colors.onSurface }]}>{userName}</Text>
-                    <Text style={[styles.inviteText, { color: theme.colors.onSurfaceVariant }]}>
-                      {POSTER_CONFIG.inviteText}
-                    </Text>
+            <Pressable style={styles.posterWrapper} onPress={() => {}}>
+              <ViewShot 
+                ref={viewShotRef} 
+                options={{ format: 'png', quality: 1.0, result: 'tmpfile' }}
+                style={[styles.posterCard, { backgroundColor: '#FFFFFF' }]}
+              >
+                {/* Header: Minimalist User Info */}
+                <View style={styles.header}>
+                  <View style={styles.userInfo}>
+                    <Avatar.Text 
+                      size={40} 
+                      label={userAvatarText} 
+                      style={{ backgroundColor: theme.colors.primaryContainer }}
+                      color={theme.colors.onPrimaryContainer}
+                    />
+                    <View style={styles.userMeta}>
+                      <Text style={styles.userName}>{userName}</Text>
+                      <Text style={styles.dateText}>{currentDate}</Text>
+                    </View>
+                  </View>
+                  <View style={styles.brandTag}>
+                    <MaterialCommunityIcons name="sprout" size={16} color={theme.colors.primary} />
+                    <Text style={[styles.brandText, { color: theme.colors.primary }]}>农屿</Text>
                   </View>
                 </View>
 
-                {/* 截图区域 (如果存在) */}
-                {screenshotUri && (
-                  <View style={styles.screenshotWrapper}>
-                    <Image 
-                      source={{ uri: screenshotUri }} 
-                      style={styles.screenshot} 
-                      resizeMode="contain"
-                    />
+                {/* Body: Screenshot or Content */}
+                <View style={styles.body}>
+                  {screenshotUri ? (
+                    <View style={[styles.screenshotContainer, { height: imageSize.height || 300 }]}>
+                      <Image 
+                        source={{ uri: screenshotUri }} 
+                        style={styles.screenshot} 
+                        resizeMode="contain"
+                      />
+                    </View>
+                  ) : (
+                    <View style={styles.placeholderContent}>
+                      <Text style={styles.placeholderText}>暂无内容</Text>
+                    </View>
+                  )}
+                  
+                  {/* Motivational Quote or Slogan */}
+                  <View style={styles.sloganContainer}>
+                    <Text style={styles.mainSlogan}>{POSTER_CONFIG.slogan}</Text>
+                    <View style={styles.divider} />
                   </View>
-                )}
-
-                {/* 主要内容 */}
-                <View style={styles.mainContent}>
-                  <Text style={[styles.appName, { color: theme.colors.primary }]}>{POSTER_CONFIG.appName}</Text>
-                  <Text style={[styles.slogan, { color: theme.colors.onSurfaceVariant }]}>{POSTER_CONFIG.slogan}</Text>
                 </View>
 
-                {/* 底部二维码 */}
-                <View style={[styles.footer, { borderTopColor: theme.colors.outlineVariant }]}>
-                  <View style={styles.qrCodeContainer}>
-                    <QRCode
-                      value={POSTER_CONFIG.qrCodeUrl}
-                      size={80}
-                      color={theme.colors.onSurface}
-                      backgroundColor="transparent"
-                    />
-                  </View>
-                  <View style={styles.footerText}>
-                    <Text style={[styles.scanHint, { color: theme.colors.onSurfaceVariant }]}>
-                      {POSTER_CONFIG.scanHint}
-                    </Text>
-                    <View style={styles.logoRow}>
-                      <MaterialCommunityIcons name="sprout" size={16} color={theme.colors.primary} />
-                      <Text style={[styles.footerLogo, { color: theme.colors.onSurfaceVariant }]}>
-                        NongYu App
-                      </Text>
+                {/* Footer: QR Code & Branding */}
+                <View style={styles.footer}>
+                  <View style={styles.qrSection}>
+                    <View style={styles.qrBorder}>
+                      <QRCode
+                        value={POSTER_CONFIG.qrCodeUrl}
+                        size={70}
+                        color="#000"
+                        backgroundColor="transparent"
+                      />
+                    </View>
+                    <View style={styles.qrTextContainer}>
+                      <Text style={styles.appName}>{POSTER_CONFIG.appName}</Text>
+                      <Text style={styles.scanHint}>{POSTER_CONFIG.scanHint}</Text>
                     </View>
                   </View>
                 </View>
-              </View>
-            </ViewShot>
+              </ViewShot>
+            </Pressable>
+            
+            {/* Spacer for bottom actions */}
+            <View style={{ height: 120 }} />
           </ScrollView>
 
-          {/* 底部操作栏 */}
-          <View style={styles.actionBar}>
-            <TouchableOpacity 
-              style={styles.closeButton} 
-              onPress={onDismiss}
-              disabled={processing}
-            >
-              <MaterialCommunityIcons name="close" size={24} color="#fff" />
-            </TouchableOpacity>
-
-            <View style={styles.actionButtons}>
-              <Button 
-                mode="contained" 
-                onPress={handleShare}
-                style={styles.actionBtn}
-                icon="share-variant"
-                loading={processing}
-                disabled={processing}
-              >
-                分享
-              </Button>
-              <Button 
-                mode="contained-tonal" 
-                onPress={handleSave}
-                style={styles.actionBtn}
-                icon="download"
-                loading={processing}
-                disabled={processing}
-              >
-                保存
-              </Button>
+          {/* Floating Action Bar - 放在 ScrollWrapper 内，绝对定位 */}
+          <SafeAreaView style={styles.actionBarContainer} pointerEvents="box-none">
+            <View style={styles.actionBar}>
+              <Surface style={styles.actionSurface} elevation={4}>
+                <TouchableOpacity style={styles.closeBtn} onPress={onDismiss}>
+                  <MaterialCommunityIcons name="close" size={24} color={theme.colors.onSurface} />
+                </TouchableOpacity>
+                
+                <View style={styles.mainActions}>
+                  <Button 
+                    mode="outlined" 
+                    onPress={handleShare}
+                    icon="share-variant"
+                    style={styles.actionBtn}
+                    disabled={processing}
+                  >
+                    分享
+                  </Button>
+                  <Button 
+                    mode="contained" 
+                    onPress={handleSave}
+                    icon="download"
+                    style={[styles.actionBtn, { backgroundColor: theme.colors.primary }]}
+                    disabled={processing}
+                    loading={processing}
+                  >
+                    保存海报
+                  </Button>
+                </View>
+              </Surface>
             </View>
-          </View>
+          </SafeAreaView>
         </View>
       </View>
     </Modal>
@@ -220,140 +244,203 @@ const SharePoster: React.FC<SharePosterProps> = observer(({ visible, onDismiss, 
 });
 
 const styles = StyleSheet.create({
-  container: {
+  modalContainer: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    backgroundColor: 'transparent',
   },
   backdrop: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.8)',
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    zIndex: 1,
   },
-  content: {
+  scrollWrapper: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 2,
+    justifyContent: 'flex-start',
+  },
+  scrollView: {
+    flex: 1,
     width: '100%',
-    height: '100%',
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingVertical: 40,
   },
   scrollContent: {
     flexGrow: 1,
-    justifyContent: 'center',
+    paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight! + 20 : 60,
+    paddingBottom: 40,
     alignItems: 'center',
-    paddingBottom: 80, // Space for action bar
   },
-  posterContainer: {
+  posterWrapper: {
+    alignItems: 'center',
+    width: '100%',
+  },
+  posterCard: {
     width: POSTER_WIDTH,
-    borderRadius: 16,
+    borderRadius: 20,
     overflow: 'hidden',
+    padding: 24,
+    backgroundColor: '#FFFFFF',
+    // Shadow
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
     elevation: 5,
   },
-  headerDecoration: {
-    height: 120,
-    width: '100%',
-    marginBottom: -60,
-  },
-  posterBody: {
-    padding: 20,
-    paddingTop: 70,
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 24,
   },
   userInfo: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 20,
   },
   userMeta: {
     marginLeft: 12,
   },
   userName: {
-    fontSize: 18,
-    fontWeight: 'bold',
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1a1a1a',
+    marginBottom: 2,
   },
-  inviteText: {
+  dateText: {
     fontSize: 12,
-    marginTop: 2,
+    color: '#8e8e93',
   },
-  screenshotWrapper: {
+  brandTag: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f5f5f7',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  brandText: {
+    fontSize: 12,
+    fontWeight: '600',
+    marginLeft: 4,
+  },
+  body: {
+    marginBottom: 24,
+  },
+  screenshotContainer: {
     width: '100%',
-    height: 500,
-    backgroundColor: '#fff',
-    marginBottom: 20,
-    borderRadius: 8,
+    backgroundColor: '#f9f9f9',
+    borderRadius: 12,
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: '#eee',
+    borderColor: '#f0f0f0',
   },
   screenshot: {
     width: '100%',
     height: '100%',
   },
-  mainContent: {
+  placeholderContent: {
+    height: 200,
+    justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 30,
+    backgroundColor: '#f5f5f7',
+    borderRadius: 12,
   },
-  appName: {
-    fontSize: 24,
-    fontWeight: '900',
-    marginBottom: 8,
+  placeholderText: {
+    color: '#8e8e93',
+  },
+  sloganContainer: {
+    marginTop: 24,
+    alignItems: 'center',
+  },
+  mainSlogan: {
+    fontSize: 18,
+    fontWeight: '500',
+    color: '#1a1a1a',
     letterSpacing: 1,
-  },
-  slogan: {
-    fontSize: 14,
     textAlign: 'center',
-    lineHeight: 20,
+  },
+  divider: {
+    width: 40,
+    height: 3,
+    backgroundColor: '#e5e5e5',
+    marginTop: 12,
+    borderRadius: 2,
   },
   footer: {
+    marginTop: 10,
+    paddingTop: 20,
+    borderTopWidth: 1,
+    borderTopColor: '#f0f0f0',
+  },
+  qrSection: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingTop: 20,
-    borderTopWidth: StyleSheet.hairlineWidth,
+    justifyContent: 'center',
   },
-  qrCodeContainer: {
-    padding: 4,
+  qrBorder: {
+    padding: 6,
     backgroundColor: '#fff',
-    borderRadius: 4,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#f0f0f0',
   },
-  footerText: {
+  qrTextContainer: {
     marginLeft: 16,
-    flex: 1,
+    justifyContent: 'center',
   },
-  scanHint: {
-    fontSize: 10,
+  appName: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: '#1a1a1a',
     marginBottom: 4,
   },
-  logoRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  footerLogo: {
+  scanHint: {
     fontSize: 12,
-    fontWeight: 'bold',
-    marginLeft: 4,
+    color: '#8e8e93',
   },
-  actionBar: {
+  actionBarContainer: {
     position: 'absolute',
     bottom: 0,
     left: 0,
     right: 0,
-    padding: 20,
+    pointerEvents: 'box-none',
+  },
+  actionBar: {
+    paddingHorizontal: 20,
+    paddingBottom: 20,
+    alignItems: 'center',
+  },
+  actionSurface: {
     flexDirection: 'row',
     alignItems: 'center',
+    backgroundColor: '#fff',
+    borderRadius: 30,
+    padding: 8,
+    paddingHorizontal: 16,
+    width: '100%',
+    maxWidth: 400,
     justifyContent: 'space-between',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 6,
   },
-  closeButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: 'rgba(255,255,255,0.2)',
+  closeBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#f5f5f7',
     justifyContent: 'center',
     alignItems: 'center',
+    marginRight: 12,
   },
-  actionButtons: {
+  mainActions: {
+    flex: 1,
     flexDirection: 'row',
-    gap: 12,
+    justifyContent: 'flex-end',
+    gap: 8,
   },
   actionBtn: {
-    minWidth: 80,
+    borderRadius: 20,
   },
 });
 

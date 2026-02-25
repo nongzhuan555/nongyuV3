@@ -8,6 +8,7 @@ import * as WebBrowser from 'expo-web-browser';
 import { WebView } from 'react-native-webview';
 import { profileStore } from '@/stores/profile';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import analytics from '@/sdk/analytics';
 
 type WebItem = {
   text: string;
@@ -88,6 +89,11 @@ const WebNav = observer(() => {
   }, [filtered.length]);
 
   const openUrl = async (item: WebItem) => {
+    analytics.trackClick('web_nav_item', 'Home', {
+      element_name: item.text,
+      page_name: 'Home',
+      url: item.url
+    });
     if (profileStore.webOpenMode === 'external') {
       await Linking.openURL(item.url);
       return;
@@ -120,6 +126,15 @@ const WebNav = observer(() => {
           placeholder="搜索网站"
           value={keyword}
           onChangeText={setKeyword}
+          onEndEditing={() => {
+            if (keyword.trim()) {
+              analytics.trackClick('web_nav_search', 'Home', {
+                element_name: '网站导航搜索',
+                page_name: 'Home',
+                keyword: keyword.trim()
+              });
+            }
+          }}
           dense
           style={[styles['webnav__searchInput'], { backgroundColor: theme.colors.surface }]}
           outlineStyle={styles['webnav__searchOutline']}

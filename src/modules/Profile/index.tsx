@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Text, View, StyleSheet, Animated, Easing, Alert, ScrollView, ImageBackground } from 'react-native';
-import { Button, IconButton, Snackbar, Portal, useTheme, Surface, Avatar, List, Divider } from 'react-native-paper';
+import { Text, View, StyleSheet, Animated, Easing, Alert, ScrollView, ImageBackground, Image } from 'react-native';
+import { Button, IconButton, Snackbar, Portal, useTheme, Surface, Avatar, List, Divider, ActivityIndicator } from 'react-native-paper';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
 import { observer } from 'mobx-react-lite';
@@ -12,6 +12,7 @@ import { themeStore } from '@/theme';
 import { useNavigation } from '@react-navigation/native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import ShareSheet from '@/components/ShareSheet';
+import analytics from '@/sdk/analytics';
 
 const InfoCard = ({ label, value, icon }: { label: string; value: string; icon: string }) => {
   const theme = useTheme();
@@ -128,6 +129,26 @@ const Profile = observer(() => {
 
       setHttpConfig({ token: '' });
       setLogged(false);
+      
+      // Update widget to empty
+      try {
+        const now = new Date();
+        const dateStr = `${now.getMonth() + 1}月${now.getDate()}日 周${['日', '一', '二', '三', '四', '五', '六'][now.getDay()]}`;
+        requestWidgetUpdate({
+          widgetName: 'TodayCourse',
+          renderWidget: () => <TodayCourseWidget courses={[]} dateStr={dateStr} />,
+          widgetInfo: {
+            widgetName: 'TodayCourse',
+            width: 320,
+            height: 120,
+            minWidth: 320,
+            minHeight: 120,
+          }
+        });
+      } catch (e) {
+        // ignore
+      }
+
       showMessage('已退出登录', 'success');
     } catch (e) {
       const httpErr = toHttpError(e);
@@ -138,9 +159,13 @@ const Profile = observer(() => {
   };
 
   const handleLogout = () => {
+    analytics.trackClick('logout_button', 'Profile', {
+      element_name: '退出登录按钮',
+      page_name: 'Profile',
+    });
     Alert.alert(
       '退出登录',
-      '确定要退出登录吗？退出后将清除所有本地数据（包括课程、考试、成绩、待办等）。',
+      '确定要退出登录吗？退出后将清除所有本地数据（包括课程、自定义日程、考试、成绩、待办等）。',
       [
         { text: '取消', style: 'cancel' },
         { text: '确定', style: 'destructive', onPress: doLogout },
@@ -177,8 +202,12 @@ const Profile = observer(() => {
       >
         <View style={[styles.loginContainer, { paddingTop: insets.top + 20 }]}>
           <View style={styles.welcomeHeader}>
-            <View style={[styles.logoContainer, { backgroundColor: theme.colors.secondaryContainer }]}>
-              <MaterialCommunityIcons name="sprout" size={32} color={theme.colors.primary} />
+            <View style={[styles.logoContainer, { backgroundColor: 'transparent' }]}>
+              <Image 
+                source={require('../../../assets/icon.png')} 
+                style={{ width: '100%', height: '100%', borderRadius: 18 }}
+                resizeMode="contain"
+              />
             </View>
             <Text style={[styles.greetingText, { color: theme.colors.onSurfaceVariant }]}>{getGreeting()}</Text>
             <Text style={[styles.loginTitle, { color: theme.colors.onSurface }]}>欢迎来到农屿</Text>
@@ -286,18 +315,38 @@ const Profile = observer(() => {
           <Surface style={[styles.listContainer, { backgroundColor: theme.colors.surface }]} elevation={0}>
             <List.Item
               title="分享农屿"
-              description="推荐给你的同学和朋友"
+              description="推荐给你的同学、朋友和室友吧"
               left={props => <List.Icon {...props} icon="share-variant-outline" />}
               right={props => <List.Icon {...props} icon="chevron-right" />}
-              onPress={() => setShareVisible(true)}
+              onPress={() => {
+                analytics.trackClick('share_button', 'Profile', {
+                  element_name: '分享农屿',
+                  page_name: 'Profile',
+                });
+                setShareVisible(true);
+              }}
             />
             <Divider />
             <List.Item
               title="关于农屿"
-              description="了解更多关于我们的信息"
+              description="了解更多关于农屿的信息"
               left={props => <List.Icon {...props} icon="information-outline" />}
               right={props => <List.Icon {...props} icon="chevron-right" />}
-              onPress={() => {}}
+              onPress={() => {
+                analytics.trackClick('about_button', 'Profile', {
+                  element_name: '关于农屿',
+                  page_name: 'Profile',
+                });
+                const url = 'https://nongyu-app.github.io/index.html';
+                if (profileStore.webOpenMode === 'external') {
+                  // @ts-ignore
+                  // 外部浏览器打开
+                  require('react-native').Linking.openURL(url).catch(() => {});
+                } else {
+                  // @ts-ignore
+                  navigation.navigate('WebViewScreen', { url, title: '关于农屿' });
+                }
+              }}
             />
           </Surface>
         </View>
@@ -336,6 +385,13 @@ const Profile = observer(() => {
           {msgText}
         </Snackbar>
       </Portal>
+
+      {logoutLoading && (
+        <View style={[styles.loadingOverlay, { backgroundColor: theme.colors.backdrop }]}>
+          <ActivityIndicator size="large" color={theme.colors.surface} />
+          <Text style={[styles.loadingText, { color: theme.colors.surface }]}>正在退出...</Text>
+        </View>
+      )}
     </View>
   );
 });
@@ -345,6 +401,17 @@ export default Profile;
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  loadingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 999,
+  },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 16,
+    fontWeight: '500',
   },
   fullScreenLayer: {
     ...StyleSheet.absoluteFillObject,

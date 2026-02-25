@@ -35,9 +35,13 @@ function pickFirst(obj, keys) {
 // 解析表格中的键值对
 function parseTablePairs(html) {
   const out = {};
-  const rows = Array.from(html.matchAll(/<tr[\s\S]*?<\/tr>/gi)).map(m => m[0]);
+  const rowMatches = html.match(/<tr[\s\S]*?<\/tr>/gi);
+  const rows = rowMatches ? Array.from(rowMatches) : [];
+  
   rows.forEach(row => {
-    const cells = Array.from(row.matchAll(/<(td|th)[^>]*>([\s\S]*?)<\/\1>/gi)).map(m => stripTags(m[2]));
+    const cellMatches = row.match(/<(td|th)[^>]*>([\s\S]*?)<\/\1>/gi);
+    const cells = cellMatches ? Array.from(cellMatches).map(c => stripTags(c)) : [];
+    
     for (let i = 0; i + 1 < cells.length; i += 2) {
       const key = cells[i].replace(/[:：]\s*$/, '').trim();
       const val = cells[i + 1].trim();

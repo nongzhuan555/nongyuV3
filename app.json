@@ -1,36 +1,48 @@
 {
   "expo": {
-    "name": "nongyu",
+    "name": "农屿",
     "slug": "nongyu",
-    "version": "1.0.0",
+    "version": "3.0.0",
     "orientation": "portrait",
-    "icon": "./assets/logo.png",
+    "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
-    "newArchEnabled": true,
+    "newArchEnabled": false,
     "splash": {
-      "image": "./assets/splash-icon.png",
+      "image": "./assets/splash-icon.jpg",
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.nongyu.app"
+      "bundleIdentifier": "com.nongyu.app",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
+      "versionCode": 2,
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
-      "package": "com.nongyu.app"
+      "package": "com.nongyu.app",
+      "permissions": [
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.READ_MEDIA_VISUAL_USER_SELECTED",
+        "android.permission.ACCESS_MEDIA_LOCATION",
+        "android.permission.READ_MEDIA_IMAGES",
+        "android.permission.READ_MEDIA_VIDEO",
+        "android.permission.READ_MEDIA_AUDIO"
+      ]
     },
     "web": {
-      "favicon": "./assets/logo.png"
+      "favicon": "./assets/favicon.png"
     },
     "plugins": [
       "expo-native-wechat",
-
       [
         "expo-media-library",
         {
@@ -38,13 +50,26 @@
           "savePhotosPermission": "允许农屿保存图片到您的相册",
           "isAccessMediaLocationEnabled": true
         }
+      ],
+      "./plugins/android-widget",
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "usesCleartextTraffic": true
+          }
+        }
       ]
     ],
     "scheme": "wx174b5a4d92447b73",
     "extra": {
       "eas": {
-        "projectId": "97b4c9d0-02d9-49d8-a658-17be8fc6851f"
+        "projectId": "a3848b51-f384-4311-bf36-ba0d8f5a0cc8"
       }
-    }
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {}
   }
 }

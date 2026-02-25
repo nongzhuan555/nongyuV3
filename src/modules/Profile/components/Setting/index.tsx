@@ -6,8 +6,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import ThemeChange from '@/modules/Common/ThemeChange';
 import { profileStore } from '@/stores/profile';
+import analytics from '@/sdk/analytics';
 
-const SettingItem = ({ 
+const SettingItem = ({  
   title, 
   description, 
   value, 
@@ -82,14 +83,29 @@ const Setting = observer(() => {
             title="应用内打开网页"
             description="关闭后将使用系统默认浏览器打开链接"
             value={profileStore.webOpenMode === 'internal'}
-            onValueChange={(v) => profileStore.setWebOpenMode(v ? 'internal' : 'external')}
+            onValueChange={(v) => {
+              const newValue = v ? 'internal' : 'external';
+              profileStore.setWebOpenMode(newValue);
+              analytics.trackClick('setting_change', 'ProfileSetting', {
+                element_name: '应用内打开网页',
+                page_name: 'ProfileSetting',
+                new_value: newValue
+              });
+            }}
           />
           <Divider style={{ marginHorizontal: 16 }} />
           <SettingItem
             title="优先进入课表"
             description="启动应用时直接显示课表页面"
             value={profileStore.defaultCourse}
-            onValueChange={(v) => profileStore.setDefaultCourse(v)}
+            onValueChange={(v) => {
+              profileStore.setDefaultCourse(v);
+              analytics.trackClick('setting_change', 'ProfileSetting', {
+                element_name: '优先进入课表',
+                page_name: 'ProfileSetting',
+                new_value: v ? 'true' : 'false'
+              });
+            }}
           />
         </SettingSection>
       </ScrollView>

@@ -5,6 +5,7 @@ import { useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import analytics from '@/sdk/analytics';
 import api, { setSecondClassToken, clearSecondClassToken, setSecondClassCredentials, debugStorage } from '../api';
 
 export default function SecondLogin() {
@@ -27,6 +28,10 @@ export default function SecondLogin() {
       return;
     }
 
+    analytics.trackClick('login_button', 'SecondLogin', {
+      element_name: '第二课堂登录按钮',
+      page_name: 'SecondLogin',
+    });
     setLoading(true);
     try {
       // Clear any existing token to ensure a fresh login attempt

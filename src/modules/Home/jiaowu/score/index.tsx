@@ -133,12 +133,14 @@ const ScoreList = observer(() => {
     }
 
     return {
-      groupedList: sortedTerms.map(term => ({
-        term,
-        courses: groups[term],
-        termCredits: groups[term].reduce((sum, item) => sum + parseCredit(item.credit), 0),
-        termAvg: groups[term].length ? (groups[term].reduce((sum, item) => sum + parseScore(item.score), 0) / groups[term].length).toFixed(1) : '0'
-      })),
+      groupedList: sortedTerms
+        .filter(term => term !== '未知学期')
+        .map(term => ({
+          term,
+          courses: groups[term],
+          termCredits: groups[term].reduce((sum, item) => sum + parseCredit(item.credit), 0),
+          termAvg: groups[term].length ? (groups[term].reduce((sum, item) => sum + parseScore(item.score), 0) / groups[term].length).toFixed(1) : '0'
+        })),
       stats: {
         totalCourses,
         totalCredits,
@@ -166,27 +168,6 @@ const ScoreList = observer(() => {
     setSelectedCourse(course);
     setModalVisible(true);
   };
-
-  const renderOverviewCard = () => (
-    <Surface style={[styles.overviewCard, { backgroundColor: theme.colors.primaryContainer }]} elevation={2}>
-      <View style={styles.overviewRow}>
-        <View style={styles.overviewItem}>
-          <Text variant="displaySmall" style={{ color: theme.colors.onPrimaryContainer, fontWeight: 'bold' }}>{stats.avgScore}</Text>
-          <Text variant="labelMedium" style={{ color: theme.colors.onPrimaryContainer, opacity: 0.8 }}>加权平均分</Text>
-        </View>
-        <Divider style={{ width: 1, height: 40, backgroundColor: theme.colors.onPrimaryContainer, opacity: 0.2 }} />
-        <View style={styles.overviewItem}>
-          <Text variant="displaySmall" style={{ color: theme.colors.onPrimaryContainer, fontWeight: 'bold' }}>{stats.totalCredits}</Text>
-          <Text variant="labelMedium" style={{ color: theme.colors.onPrimaryContainer, opacity: 0.8 }}>总学分</Text>
-        </View>
-      </View>
-      <View style={styles.overviewFooter}>
-        <Text variant="bodySmall" style={{ color: theme.colors.onPrimaryContainer }}>
-          共修 {stats.totalCourses} 门课程，通过 {stats.passedCourses} 门
-        </Text>
-      </View>
-    </Surface>
-  );
 
   return (
     <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
@@ -226,8 +207,6 @@ const ScoreList = observer(() => {
                <Text style={{ color: theme.colors.onErrorContainer, marginLeft: 8 }}>{swrError.message || '获取成绩失败，请稍后重试'}</Text>
              </Surface>
           )}
-
-          {!keyword && renderOverviewCard()}
 
           {groupedList.length === 0 ? (
             <View style={styles.emptyContainer}>
@@ -465,5 +444,11 @@ const styles = StyleSheet.create({
     flex: 1,
     textAlign: 'right',
     marginLeft: 16,
+  },
+  footerContainer: {
+    paddingVertical: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    opacity: 0.8,
   },
 });

@@ -2,7 +2,7 @@
 // 说明：根据“农屿app需求文档”，底部Tab从左到右为：首页、课程、广场、个人。
 // 本文件提供页面骨架与占位文案，主题相关逻辑已抽离到 src/theme 模块。
 import { StatusBar } from 'expo-status-bar';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { Text, View, StyleSheet } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
@@ -16,7 +16,9 @@ import { observer } from 'mobx-react-lite';
 import { themeStore } from '@/theme';
 import { profileStore } from '@/stores/profile';
 import { registerApp } from '@/utils/wechat';
+import analytics from '@/sdk/analytics';
 import RootTabs from '@/navigation/RootTabs';
+import env from '@/config';
 import JiaowuHome from '@/modules/Home/jiaowu';
 import SecondHome from '@/modules/Home/second';
 import SecondLogin from '@/modules/Home/second/Login';
@@ -27,6 +29,7 @@ import ProgressList from '@/modules/Home/jiaowu/progress';
 import RankList from '@/modules/Home/jiaowu/rank';
 import ScoreList from '@/modules/Home/jiaowu/score';
 import NoticeDetail from '@/modules/Home/notice';
+import NoticeList from '@/modules/Home/notice/NoticeList';
 import JiaowuNotice from '@/modules/Home/jiaowu/notice';
 import JiaowuCompetition from '@/modules/Home/jiaowu/competition';
 import JiaowuExam from '@/modules/Home/jiaowu/exam';
@@ -43,6 +46,8 @@ const AppContent = observer(() => {
   const insets = useSafeAreaInsets();
   const [errorVisible, setErrorVisible] = useState(false);
   const [errorKey, setErrorKey] = useState(0);
+  const routeNameRef = useRef<string>();
+  const navigationRef = useRef<any>();
 
   useEffect(() => {
     setRequestErrorHandler(() => {
@@ -57,7 +62,37 @@ const AppContent = observer(() => {
   return (
     <>
       <ErrorBoundary>
-        <NavigationContainer theme={themeStore.navTheme}>
+        <NavigationContainer 
+          theme={themeStore.navTheme}
+          ref={navigationRef}
+          onReady={() => {
+            routeNameRef.current = navigationRef.current.getCurrentRoute().name;
+          }}
+          onStateChange={async () => {
+            const previousRouteName = routeNameRef.current;
+            const currentRoute = navigationRef.current.getCurrentRoute();
+            const currentRouteName = currentRoute.name;
+
+            if (previousRouteName !== currentRouteName) {
+              // 仅采集特定页面的访问事件
+              const shouldTrack = 
+                currentRouteName.startsWith('Jiaowu') || 
+                currentRouteName.startsWith('Second') || 
+                currentRouteName === '课表' ||
+                currentRouteName === 'ProfileSetting' ||
+                currentRouteName === '个人' ||
+                currentRouteName === 'NoticeDetail';
+
+              if (shouldTrack) {
+                analytics.trackPageView(currentRouteName, {
+                  page_name: currentRouteName,
+                  prev_page_name: previousRouteName,
+                });
+              }
+            }
+            routeNameRef.current = currentRouteName;
+          }}
+        >
           <Stack.Navigator screenOptions={{ headerShown: false }}>
             {!isNongyuLogged ? (
               // @ts-ignore
@@ -75,6 +110,7 @@ const AppContent = observer(() => {
                 <Stack.Screen name="SecondActivityDetail" component={SecondActivityDetail} />
                 <Stack.Screen name="SecondUserInfo" component={SecondUserInfo} />
                 <Stack.Screen name="NoticeDetail" component={NoticeDetail} />
+                <Stack.Screen name="NoticeList" component={NoticeList} />
                 <Stack.Screen name="JiaowuNotice" component={JiaowuNotice} />
                 <Stack.Screen name="JiaowuCompetition" component={JiaowuCompetition} />
                 <Stack.Screen name="JiaowuExam" component={JiaowuExam} />
@@ -115,7 +151,26 @@ const App = observer(() => {
     }).catch(e => {
       console.warn('WeChat registerApp failed:', e);
     });
+
+    // 初始化埋点 SDK
+    analytics.init({
+      endpoint: `${env.api.baseURL}/events/track`,
+      debug: __DEV__,
+    });
+    analytics.trackAppLaunch();
   }, []);
+
+  // 监听用户ID和Token变化
+  useEffect(() => {
+    const updates: any = {};
+    if (profileStore.profile?.studentId) {
+      updates.userId = profileStore.profile.studentId;
+      analytics.setUserId(profileStore.profile.studentId);
+    }
+    if (profileStore.token) {
+      analytics.init({ token: profileStore.token });
+    }
+  }, [profileStore.profile?.studentId, profileStore.token]);
 
   if (!themeStore.ready || !profileStore.ready) {
     return (
